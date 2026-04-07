@@ -8,9 +8,9 @@ public class Electronics extends Item {
     private int warrantyMonths;
     private String serialNumber;
 
-    public Electronics(String id, String name, String description, double startingPrice, LocalDateTime bidStartTime, LocalDateTime bidEndTime,
-                       int wattage, String origin, int warrantyMonths, String serialNumber) {
-        super(id, name, description, startingPrice, bidStartTime, bidEndTime);
+    public Electronics(String id, String name, String description, double startingPrice, double priceStep, LocalDateTime bidStartTime, LocalDateTime bidEndTime,
+                       String sellerId, int wattage, String origin, int warrantyMonths, String serialNumber) {
+        super(id, name, description, startingPrice, priceStep, bidStartTime, bidEndTime, sellerId);
         this.wattage = wattage;
         this.origin = origin;
         this.warrantyMonths = warrantyMonths;
