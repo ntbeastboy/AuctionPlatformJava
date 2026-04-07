@@ -8,17 +8,25 @@ public class Item implements Entity {
     private String description;
     final double startingPrice;
     private double currentPrice;
+    final double priceStep;
     private LocalDateTime bidStartTime;
     private LocalDateTime bidEndTime;
+    final String sellerId;
+    private AuctionStatus status;
+    private String currentWinnerId;
 
-    public Item(String id, String name, String description, double startingPrice, LocalDateTime bidStartTime, LocalDateTime bidEndTime) {
+    public Item(String id, String name, String description, double startingPrice, double priceStep, LocalDateTime bidStartTime, LocalDateTime bidEndTime, String sellerId) {
         this.id = id;
         this.name = name;
         this.description = description;
         this.startingPrice = startingPrice;
         this.currentPrice = startingPrice;
+        this.priceStep = priceStep;
         this.bidStartTime = bidStartTime;
         this.bidEndTime = bidEndTime;
+        this.sellerId = sellerId;
+        this.status = AuctionStatus.ACTIVE;
+        this.currentWinnerId = null;
     }
 
     @Override
@@ -38,6 +46,8 @@ public class Item implements Entity {
 
     public void setCurrentPrice(double currentPrice) { this.currentPrice = currentPrice; }
 
+    public double getPriceStep() { return priceStep; }
+
     public LocalDateTime getBidStartTime() { return bidStartTime; }
 
     public void setBidStartTime(LocalDateTime bidStartTime) { this.bidStartTime = bidStartTime; }
@@ -45,4 +55,14 @@ public class Item implements Entity {
     public LocalDateTime getBidEndTime() { return bidEndTime; }
 
     public void setBidEndTime(LocalDateTime bidEndTime) { this.bidEndTime = bidEndTime; }
+
+    public String getSellerId() { return sellerId; }
+
+    public AuctionStatus getStatus() { return status; }
+
+    public void setStatus(AuctionStatus status) { this.status = status; }
+
+    public String getCurrentWinnerId() { return currentWinnerId; }
+
+    public void setCurrentWinnerId(String currentWinnerId) { this.currentWinnerId = currentWinnerId; }
 }

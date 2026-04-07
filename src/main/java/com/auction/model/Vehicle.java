@@ -10,9 +10,9 @@ public class Vehicle extends Item {
     private String vin;
     private boolean accidentHistory;
 
-    public Vehicle(String id, String name, String description, double startingPrice, LocalDateTime bidStartTime, LocalDateTime bidEndTime,
-                   int miles, LocalDate manufacturingDate, String brand, String vin, boolean accidentHistory) {
-        super(id, name, description, startingPrice, bidStartTime, bidEndTime);
+    public Vehicle(String id, String name, String description, double startingPrice, double priceStep, LocalDateTime bidStartTime, LocalDateTime bidEndTime,
+                   String sellerId, int miles, LocalDate manufacturingDate, String brand, String vin, boolean accidentHistory) {
+        super(id, name, description, startingPrice, priceStep, bidStartTime, bidEndTime, sellerId);
         this.miles = miles;
         this.manufacturingDate = manufacturingDate;
         this.brand = brand;
