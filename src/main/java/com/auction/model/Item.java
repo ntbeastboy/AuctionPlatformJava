@@ -1,8 +1,8 @@
-package AuctionPlatformJava.src.main.java.com.auction.model;
+package com.auction.model;
 
 import java.time.LocalDateTime;
 
-public class Item implements Entity {
+public abstract class Item implements Entity {
     final String id;
     private String name;
     private String description;
@@ -25,7 +25,7 @@ public class Item implements Entity {
         this.bidStartTime = bidStartTime;
         this.bidEndTime = bidEndTime;
         this.sellerId = sellerId;
-        this.status = AuctionStatus.ACTIVE;
+        this.status = AuctionStatus.OPEN;
         this.currentWinnerId = null;
     }
 

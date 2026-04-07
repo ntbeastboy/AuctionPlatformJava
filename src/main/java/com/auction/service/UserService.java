@@ -1,11 +1,11 @@
-package AuctionPlatformJava.src.main.java.com.auction.service;
+package com.auction.service;
 
-import AuctionPlatformJava.src.main.java.com.auction.exception.InvalidInputException;
-import AuctionPlatformJava.src.main.java.com.auction.exception.UnauthorizedActionException;
-import AuctionPlatformJava.src.main.java.com.auction.model.Bidder;
-import AuctionPlatformJava.src.main.java.com.auction.model.Seller;
-import AuctionPlatformJava.src.main.java.com.auction.model.User;
-import AuctionPlatformJava.src.main.java.com.auction.repository.UserRepository;
+import com.auction.exception.InvalidInputException;
+import com.auction.exception.UnauthorizedActionException;
+import com.auction.model.Bidder;
+import com.auction.model.Seller;
+import com.auction.model.User;
+import com.auction.repository.UserRepository;
 
 import java.util.UUID;
 

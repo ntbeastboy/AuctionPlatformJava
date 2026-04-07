@@ -1,6 +1,6 @@
-package AuctionPlatformJava.src.main.java.com.auction.repository;
+package com.auction.repository;
 
-import AuctionPlatformJava.src.main.java.com.auction.model.User;
+import com.auction.model.User;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -19,5 +19,9 @@ public class UserRepository {
 
     public boolean existsByUsername(String username) {
         return store.containsKey(username);
+    }
+
+    public Optional<User> findById(String id) {
+        return store.values().stream().filter(u -> u.getId().equals(id)).findFirst();
     }
 }
