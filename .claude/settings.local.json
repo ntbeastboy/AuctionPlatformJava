@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find \"C:\\\\Users\\\\Vantablack\\\\AuctionPlatformJava\\\\src\" -name \"*.java\" -exec sed -i 's/AuctionPlatformJava\\\\.src\\\\.main\\\\.java\\\\.//g' {} +)",
+      "Bash(xargs grep:*)",
+      "Bash(./gradlew compileJava)",
+      "Bash(gradle --version)"
+    ]
+  }
+}

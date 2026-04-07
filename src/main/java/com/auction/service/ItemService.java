@@ -1,17 +1,19 @@
-package AuctionPlatformJava.src.main.java.com.auction.service;
+package com.auction.service;
 
-import AuctionPlatformJava.src.main.java.com.auction.exception.AuctionClosedException;
-import AuctionPlatformJava.src.main.java.com.auction.exception.InvalidBidException;
-import AuctionPlatformJava.src.main.java.com.auction.exception.ProductNotFoundException;
-import AuctionPlatformJava.src.main.java.com.auction.exception.UnauthorizedActionException;
-import AuctionPlatformJava.src.main.java.com.auction.model.Admin;
-import AuctionPlatformJava.src.main.java.com.auction.model.AuctionStatus;
-import AuctionPlatformJava.src.main.java.com.auction.model.Bid;
-import AuctionPlatformJava.src.main.java.com.auction.model.Bidder;
-import AuctionPlatformJava.src.main.java.com.auction.model.Item;
-import AuctionPlatformJava.src.main.java.com.auction.model.Seller;
-import AuctionPlatformJava.src.main.java.com.auction.model.User;
-import AuctionPlatformJava.src.main.java.com.auction.repository.ItemRepository;
+import com.auction.exception.AuctionClosedException;
+import com.auction.exception.InvalidBidException;
+import com.auction.exception.ProductNotFoundException;
+import com.auction.exception.UnauthorizedActionException;
+import com.auction.model.Admin;
+import com.auction.model.AuctionStatus;
+import com.auction.model.Bid;
+import com.auction.model.Bidder;
+import com.auction.model.Item;
+import com.auction.model.Seller;
+import com.auction.model.User;
+import com.auction.repository.ItemRepository;
+
+import java.util.UUID;
 
 public class ItemService {
     private final ItemRepository itemRepository;
@@ -39,17 +41,10 @@ public class ItemService {
         if (item.getStatus() == AuctionStatus.ENDED)
             throw new AuctionClosedException("This auction has already ended.");
 
-        if (amount <= 0)
-            throw new InvalidBidException("Bid amount must be positive.");
-
-        double minimumBid = item.getCurrentPrice() + item.getPriceStep();
-        if (amount < minimumBid)
-            throw new InvalidBidException(
-                "Bid must be at least " + minimumBid + " (current price " + item.getCurrentPrice() + " + step " + item.getPriceStep() + ")."
-            );
+        if (amount <= item.getCurrentPrice())
+            throw new InvalidBidException("Bid must be higher than the current price of " + item.getCurrentPrice() + ".");
 
         item.setCurrentPrice(amount);
-        item.setCurrentWinnerId(user.getId());
         return new Bid(user.getId(), itemId, amount);
     }
 

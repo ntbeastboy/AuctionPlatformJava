@@ -1,6 +1,6 @@
-package AuctionPlatformJava.src.main.java.com.auction.repository;
+package com.auction.repository;
 
-import AuctionPlatformJava.src.main.java.com.auction.model.User;
+import com.auction.model.User;
 
 import java.util.HashMap;
 import java.util.Map;

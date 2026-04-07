@@ -1,4 +1,4 @@
-package AuctionPlatformJava.src.main.java.com.auction.model;
+package com.auction.model;
 
 public class Bidder extends BannableUser {
     private double balance;

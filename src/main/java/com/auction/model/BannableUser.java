@@ -1,4 +1,4 @@
-package AuctionPlatformJava.src.main.java.com.auction.model;
+package com.auction.model;
 
 public abstract class BannableUser extends User {
 

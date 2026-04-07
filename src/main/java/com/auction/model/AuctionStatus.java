@@ -1,4 +1,4 @@
-package AuctionPlatformJava.src.main.java.com.auction.model;
+package com.auction.model;
 
 public enum AuctionStatus {
     ACTIVE,

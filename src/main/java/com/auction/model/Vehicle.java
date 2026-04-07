@@ -1,4 +1,4 @@
-package AuctionPlatformJava.src.main.java.com.auction.model;
+package com.auction.model;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
