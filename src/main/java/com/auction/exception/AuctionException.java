@@ -5,15 +5,15 @@ import com.auction.util.ErrorCode;
 public class AuctionException extends RuntimeException {
     private final ErrorCode errorCode;
 
-    public AuctionExecption(ErrorCode errorcode)
+    public AuctionException(ErrorCode errorcode)
     {
-        super(errorCode.getMessage());
-        this.errorCode = errorCode;
+        super(errorcode.getMessage());
+        this.errorCode = errorcode;
     }
     public AuctionException(ErrorCode errorcode, Throwable cause)
     {
-        super(errorCode.getMessage(), cause);
-        this.errorCode = errorCode;
+        super(errorcode.getMessage(), cause);
+        this.errorCode = errorcode;
     }
     public ErrorCode getErrorCode()
     {
