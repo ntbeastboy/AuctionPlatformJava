@@ -30,8 +30,22 @@ repositories {
 }
 
 dependencies {
+    implementation 'org.openjfx:javafx-controls:21'
+    implementation 'org.openjfx:javafx-fxml:21'
+    implementation 'org.openjfx:javafx-graphics:21'
+
     testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+run {
+    doFirst {
+        systemProperties System.getProperties()
+    }
+    jvmArgs = [
+        '--enable-native-access=javafx.graphics',
+        '--add-opens=java.base/java.lang=ALL-UNNAMED'
+    ]
 }
 
 test {

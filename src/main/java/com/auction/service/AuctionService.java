@@ -11,7 +11,6 @@ import com.auction.model.Seller;
 import com.auction.model.User;
 import com.auction.repository.ItemRepository;
 import com.auction.repository.UserRepository;
-
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.concurrent.Executors;
@@ -136,7 +135,7 @@ public class AuctionService {
 
         if (winnerUser instanceof Bidder bidderWinner) bidderWinner.deductFunds(winningPrice);
         else ((Seller) winnerUser).withdraw(winningPrice);
-        seller.addFunds(winningPrice);
+        ((Seller) sellerUser).addFunds(winningPrice);
         item.setStatus(AuctionStatus.PAID);
     }
 
