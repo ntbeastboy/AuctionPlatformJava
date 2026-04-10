@@ -46,7 +46,7 @@ public class LoginController {
             stage.setScene(scene);
             stage.setResizable(true);
         } catch (Exception e) {
-            errorLabel.setText(e.getMessage());
+            showMessage(e.getMessage(), true);
         }
     }
 
@@ -60,7 +60,7 @@ public class LoginController {
             controller.init(appState, stage);
             stage.setScene(scene);
         } catch (IOException e) {
-            errorLabel.setText("Failed to load register page.");
+            showMessage("Failed to load register page.", true);
         }
     }
 }
