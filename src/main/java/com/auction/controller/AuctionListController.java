@@ -119,6 +119,7 @@ public class AuctionListController {
         controller.init(appState, stage);
         stage.setScene(scene);
         stage.setResizable(false);
+        stage.setTitle("Auction Platform");
     }
 
     @FXML
