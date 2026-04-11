@@ -1,15 +1,34 @@
-<div align="center">
+<div align="center">🧾 BÀI TẬP LỚN LẬP TRÌNH NÂNG CAO
 
-## BÀI TẬP LỚN LẬP TRÌNH NÂNG CAO
-### --- &nbsp;  Phát Triển Hệ Thống Đấu Giá Trực Tuyến &nbsp; ---
-### Nhóm 2 - CS7 - UET
+🌐 Phát Triển Hệ Thống Đấu Giá Trực Tuyến
+
+👥 Nhóm 2 – CS7 – UET
+
 </div>
+---
 
-### Thành viên :
-#### &nbsp; &nbsp;1. Hồ Văn Hợp
-#### &nbsp; &nbsp;2. Lê Nguyễn Minh Hiếu
-#### &nbsp; &nbsp;3. Kim Gia Huy
-#### &nbsp; &nbsp;4. Võ Văn Quốc
+📌 Thành viên
 
-### Các điểm cần bổ sung hoặc sửa chữa :
-#### &nbsp; &nbsp;1. lúc rút tiền nhập vd: "1e3" sẽ tự hiểu 1000
+Hồ Văn Hợp
+
+Lê Nguyễn Minh Hiếu
+
+Kim Gia Huy
+
+Võ Văn Quốc
+
+
+
+---
+
+🛠️ To-Do (Các điểm cần bổ sung / sửa chữa)
+
+[ ] 💰 Xử lý nhập số khi rút tiền
+
+Hiện tại: nhập 1e3 được hiểu là 1000
+
+Cần:
+
+[ ] Giới hạn định dạng nhập (chỉ cho phép số hợp lệ như 1000, 1000.0)
+
+[ ] Hoặc hiển thị thông báo rõ ràng khi người dùng nhập dạng khoa học (1e3)
