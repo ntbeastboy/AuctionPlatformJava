@@ -1,13 +1,14 @@
-<div align="center">🧾 BÀI TẬP LỚN LẬP TRÌNH NÂNG CAO
+<div align="center">#🧾 BÀI TẬP LỚN LẬP TRÌNH NÂNG CAO
 
-🌐 Phát Triển Hệ Thống Đấu Giá Trực Tuyến
+##🌐 Phát Triển Hệ Thống Đấu Giá Trực Tuyến
 
-👥 Nhóm 2 – CS7 – UET
+###👥 Nhóm 2 – CS7 – UET
 
 </div>
+
 ---
 
-📌 Thành viên
+##📌 Thành viên
 
 Hồ Văn Hợp
 
@@ -21,7 +22,7 @@ Võ Văn Quốc
 
 ---
 
-🛠️ To-Do (Các điểm cần bổ sung / sửa chữa)
+##🛠️ To-Do (Các điểm cần bổ sung / sửa chữa)
 
 [ ] 💰 Xử lý nhập số khi rút tiền
 
