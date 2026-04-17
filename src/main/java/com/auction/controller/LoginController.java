@@ -46,6 +46,7 @@ public class LoginController {
             stage.setScene(scene);
             stage.setResizable(true);
         } catch (Exception e) {
+            errorLabel.setStyle("error-label");
             errorLabel.setText(e.getMessage());
         }
     }

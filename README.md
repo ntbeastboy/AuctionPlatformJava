@@ -22,4 +22,4 @@
 - [ ] Hiện tại: nhập `1e3` được hiểu là `1000`
 - [ ] Giới hạn định dạng nhập (chỉ cho phép số như `1000`, `1000.0`)
 - [ ] Hoặc hiển thị thông báo rõ ràng khi nhập dạng khoa học (`1e3`)
-- [ ] thông báo nhập sai mật khẩu sau khi tạo tài khoản mới hiện xanh -> sửa lại đỏ
+- [X] thông báo nhập sai mật khẩu sau khi tạo tài khoản mới hiện xanh -> sửa lại đỏ
