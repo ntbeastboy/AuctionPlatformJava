@@ -74,6 +74,7 @@ public class RegisterController {
 
     private void showError(String msg) {
         errorLabel.setStyle("-fx-text-fill: #c0392b;");
+        errorLabel.setStyle("-fx-alignment: CENTER;");
         errorLabel.setText(msg);
     }
 }

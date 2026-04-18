@@ -22,8 +22,12 @@ public class UserService {
     public User register(String username, String password, RegisterRole role) {
         if (username == null || username.isBlank())
             throw new InvalidInputException("Username cannot be empty.");
+        else if(username.contains(" "))
+            throw new InvalidInputException("Usernames cannot contain spaces.");
         if (password == null || password.isBlank())
             throw new InvalidInputException("Password cannot be empty.");
+        else if(username.contains(" "))
+            throw new InvalidInputException("Password cannot contain spaces.");
         if (userRepository.existsByUsername(username))
             throw new InvalidInputException("Username already taken.");
 
