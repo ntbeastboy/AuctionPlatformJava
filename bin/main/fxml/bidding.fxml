@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<VBox xmlns:fx="http://javafx.com/fxml" fx:controller="com.auction.controller.BiddingController"
+      spacing="12" styleClass="root-pane">
+    <padding><Insets topRightBottomLeft="24"/></padding>
+
+    <Label text="Place a Bid" styleClass="title"/>
+
+    <GridPane hgap="12" vgap="8">
+        <Label text="Name:"          GridPane.rowIndex="0" GridPane.columnIndex="0" styleClass="detail-key"/>
+        <Label fx:id="lblName"       GridPane.rowIndex="0" GridPane.columnIndex="1" styleClass="detail-val"/>
+
+        <Label text="Description:"   GridPane.rowIndex="1" GridPane.columnIndex="0" styleClass="detail-key"/>
+        <Label fx:id="lblDesc"       GridPane.rowIndex="1" GridPane.columnIndex="1" styleClass="detail-val" wrapText="true" maxWidth="340"/>
+
+        <Label text="Type:"          GridPane.rowIndex="2" GridPane.columnIndex="0" styleClass="detail-key"/>
+        <Label fx:id="lblType"       GridPane.rowIndex="2" GridPane.columnIndex="1" styleClass="detail-val"/>
+
+        <Label text="Status:"        GridPane.rowIndex="3" GridPane.columnIndex="0" styleClass="detail-key"/>
+        <Label fx:id="lblStatus"     GridPane.rowIndex="3" GridPane.columnIndex="1" styleClass="detail-val"/>
+
+        <Label text="Current Price:" GridPane.rowIndex="4" GridPane.columnIndex="0" styleClass="detail-key"/>
+        <Label fx:id="lblPrice"      GridPane.rowIndex="4" GridPane.columnIndex="1" styleClass="detail-val"/>
+
+        <Label text="Min Next Bid:"  GridPane.rowIndex="5" GridPane.columnIndex="0" styleClass="detail-key"/>
+        <Label fx:id="lblMinBid"     GridPane.rowIndex="5" GridPane.columnIndex="1" styleClass="detail-val"/>
+
+        <Label text="End Time:"      GridPane.rowIndex="6" GridPane.columnIndex="0" styleClass="detail-key"/>
+        <Label fx:id="lblEndTime"    GridPane.rowIndex="6" GridPane.columnIndex="1" styleClass="detail-val"/>
+    </GridPane>
+
+    <Separator/>
+
+    <HBox spacing="12" alignment="CENTER_LEFT">
+        <Label text="Your bid:"/>
+        <TextField fx:id="bidAmountField" promptText="Amount" prefWidth="140"/>
+        <Button text="Place Bid" onAction="#onPlaceBid" styleClass="btn-primary"/>
+    </HBox>
+
+    <Label fx:id="statusLabel" styleClass="error-label" wrapText="true" maxWidth="460"/>
+
+    <Region VBox.vgrow="ALWAYS"/>
+    <Button text="← Back" onAction="#onBack" styleClass="btn-secondary" prefWidth="100"/>
+</VBox>

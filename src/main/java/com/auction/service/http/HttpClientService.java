@@ -6,6 +6,7 @@ import okhttp3.Request;
 import okhttp3.Response;
 
 import java.io.IOException;
+import java.util.concurrent.TimeUnit;
 
 public class HttpClientService {
 
@@ -14,7 +15,11 @@ public class HttpClientService {
     private final Gson gson;
 
     public HttpClientService() {
-        this.httpClient = new OkHttpClient();
+        this.httpClient = new OkHttpClient.Builder()
+                .connectTimeout(10, TimeUnit.SECONDS)
+                .readTimeout(30, TimeUnit.SECONDS)
+                .writeTimeout(30, TimeUnit.SECONDS)
+                .build();
         this.gson = new Gson();
     }
 
@@ -25,7 +30,8 @@ public class HttpClientService {
 
         try (Response response = httpClient.newCall(request).execute()) {
             if (!response.isSuccessful()) {
-                throw new IOException("Unexpected code " + response);
+                String errorBody = response.body() != null ? response.body().string() : "Unknown error";
+                throw new IOException("HTTP " + response.code() + ": " + errorBody);
             }
             return response.body() != null ? response.body().string() : "";
         }
@@ -43,7 +49,7 @@ public class HttpClientService {
         try (Response response = httpClient.newCall(request).execute()) {
             if (!response.isSuccessful()) {
                 String errorBody = response.body() != null ? response.body().string() : "Unknown error";
-                throw new IOException("Error: " + response.code() + " - " + errorBody);
+                throw new IOException("HTTP " + response.code() + ": " + errorBody);
             }
             return response.body() != null ? response.body().string() : "";
         }
@@ -60,7 +66,8 @@ public class HttpClientService {
 
         try (Response response = httpClient.newCall(request).execute()) {
             if (!response.isSuccessful()) {
-                throw new IOException("Unexpected code " + response);
+                String errorBody = response.body() != null ? response.body().string() : "Unknown error";
+                throw new IOException("HTTP " + response.code() + ": " + errorBody);
             }
             return response.body() != null ? response.body().string() : "";
         }

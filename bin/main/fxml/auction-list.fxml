@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<VBox xmlns:fx="http://javafx.com/fxml" fx:controller="com.auction.controller.AuctionListController"
+      spacing="10" styleClass="root-pane">
+    <padding><Insets topRightBottomLeft="14"/></padding>
+
+    <!-- Header -->
+    <HBox alignment="CENTER_LEFT" spacing="12" styleClass="header-bar">
+        <Label fx:id="userInfoLabel" styleClass="user-info"/>
+        <Region HBox.hgrow="ALWAYS"/>
+        <Button fx:id="addFundsBtn"  text="Add Funds" onAction="#onAddFunds"  styleClass="btn-secondary" managed="false" visible="false"/>
+        <Button fx:id="withdrawBtn"  text="Withdraw"  onAction="#onWithdraw"  styleClass="btn-secondary" managed="false" visible="false"/>
+        <Button text="Logout" onAction="#onLogout" styleClass="btn-danger"/>
+    </HBox>
+
+    <!-- Table -->
+    <TableView fx:id="itemTable" VBox.vgrow="ALWAYS" styleClass="item-table">
+        <columns>
+            <TableColumn fx:id="colName"       text="Name"          prefWidth="160"/>
+            <TableColumn fx:id="colType"       text="Type"          prefWidth="90"/>
+            <TableColumn fx:id="colStatus"     text="Status"        prefWidth="90"/>
+            <TableColumn fx:id="colPrice"      text="Current Price" prefWidth="110"/>
+            <TableColumn fx:id="colMinBid"     text="Min Next Bid"  prefWidth="110"/>
+            <TableColumn fx:id="colEndTime"    text="End Time"      prefWidth="150"/>
+            <TableColumn fx:id="colWinner"     text="Winner"        prefWidth="110"/>
+        </columns>
+    </TableView>
+
+    <!-- Action bar -->
+    <HBox spacing="8" alignment="CENTER_LEFT">
+        <Button text="Refresh" onAction="#onRefresh" styleClass="btn-secondary"/>
+        <Region prefWidth="20"/>
+
+        <!-- Seller -->
+        <Button fx:id="createItemBtn" text="Create Item" onAction="#onCreateItem"
+                styleClass="btn-primary" managed="false" visible="false"/>
+
+        <!-- Admin -->
+        <Button fx:id="startBtn"    text="Start"     onAction="#onStart"       styleClass="btn-primary"   managed="false" visible="false"/>
+        <Button fx:id="endEarlyBtn" text="End Early" onAction="#onEndEarly"    styleClass="btn-secondary" managed="false" visible="false"/>
+        <Button fx:id="cancelBtn"   text="Cancel"    onAction="#onCancel"      styleClass="btn-danger"    managed="false" visible="false"/>
+        <Button fx:id="deleteBtn"   text="Delete"    onAction="#onDelete"      styleClass="btn-danger"    managed="false" visible="false"/>
+        <Button fx:id="markPaidBtn" text="Mark Paid" onAction="#onMarkPaid"    styleClass="btn-primary"   managed="false" visible="false"/>
+
+        <!-- Bidder / Seller -->
+        <Button fx:id="placeBidBtn"    text="Place Bid"       onAction="#onPlaceBid"      styleClass="btn-primary"   managed="false" visible="false"/>
+        <Button fx:id="confirmPayBtn"  text="Confirm"         onAction="#onConfirmPay"    styleClass="btn-primary"   managed="false" visible="false"/>
+    </HBox>
+
+    <Label fx:id="statusLabel" styleClass="error-label"/>
+</VBox>

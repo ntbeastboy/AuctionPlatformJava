@@ -3,16 +3,18 @@ package com.auction.service.network;
 import com.auction.dto.UserRemoteDto;
 import com.auction.service.http.HttpClientService;
 import com.google.gson.reflect.TypeToken;
-import lombok.RequiredArgsConstructor;
 
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
-@RequiredArgsConstructor
 public class NetworkUserService {
 
     private final HttpClientService httpClient;
+
+    public NetworkUserService(HttpClientService httpClient) {
+        this.httpClient = httpClient;
+    }
 
     public UserRemoteDto login(String username, String password) throws IOException {
         Map<String, String> loginData = new HashMap<>();

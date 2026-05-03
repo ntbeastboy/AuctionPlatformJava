@@ -127,6 +127,7 @@ public class AuctionListController {
             try {
                 if (appState.currentUser instanceof Bidder b) b.addFunds(amount);
                 else if (appState.currentUser instanceof Seller s) s.addFunds(amount);
+                appState.userRepository.save(appState.currentUser);
                 refreshUserInfo();
                 showStatus("Added $" + String.format("%.2f", amount) + " to your balance.", false);
             } catch (Exception e) {
@@ -155,6 +156,7 @@ public class AuctionListController {
                 double amount = Double.parseDouble(val.trim());
                 if (appState.currentUser instanceof Bidder b) b.withdraw(amount);
                 else if (appState.currentUser instanceof Seller s) s.withdraw(amount);
+                appState.userRepository.save(appState.currentUser);
                 refreshUserInfo();
                 showStatus("Withdrew $" + String.format("%.2f", amount) + " from your balance.", false);
             } catch (Exception e) {

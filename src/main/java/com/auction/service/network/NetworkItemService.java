@@ -3,17 +3,19 @@ package com.auction.service.network;
 import com.auction.dto.ItemRemoteDto;
 import com.auction.service.http.HttpClientService;
 import com.google.gson.reflect.TypeToken;
-import lombok.RequiredArgsConstructor;
 
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-@RequiredArgsConstructor
 public class NetworkItemService {
 
     private final HttpClientService httpClient;
+
+    public NetworkItemService(HttpClientService httpClient) {
+        this.httpClient = httpClient;
+    }
 
     public ItemRemoteDto createItem(String sellerId, String name, String description, String category, Double startPrice) throws IOException {
         Map<String, Object> itemData = new HashMap<>();

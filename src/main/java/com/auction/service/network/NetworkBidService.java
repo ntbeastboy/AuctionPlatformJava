@@ -3,17 +3,19 @@ package com.auction.service.network;
 import com.auction.dto.BidRemoteDto;
 import com.auction.service.http.HttpClientService;
 import com.google.gson.reflect.TypeToken;
-import lombok.RequiredArgsConstructor;
 
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-@RequiredArgsConstructor
 public class NetworkBidService {
 
     private final HttpClientService httpClient;
+
+    public NetworkBidService(HttpClientService httpClient) {
+        this.httpClient = httpClient;
+    }
 
     public BidRemoteDto placeBid(String bidderId, String itemId, Double bidAmount) throws IOException {
         Map<String, Object> bidData = new HashMap<>();

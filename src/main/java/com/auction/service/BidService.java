@@ -11,6 +11,7 @@ import com.auction.model.Item;
 import com.auction.model.Seller;
 import com.auction.model.User;
 import com.auction.repository.ItemRepository;
+import java.time.LocalDateTime;
 
 public class BidService {
     private final ItemRepository itemRepository;
@@ -29,31 +30,37 @@ public class BidService {
         if (user instanceof Seller && item.getSellerId().equals(user.getId()))
             throw new UnauthorizedActionException("Sellers cannot bid on their own items.");
 
-        if (item.getStatus() != AuctionStatus.RUNNING)
-            throw new AuctionClosedException("This auction is not currently running.");
+        synchronized (item) {
+            if (item.getStatus() != AuctionStatus.RUNNING)
+                throw new AuctionClosedException("This auction is not currently running.");
 
-        if (amount <= 0)
-            throw new InvalidBidException("Bid amount must be positive.");
+            if (LocalDateTime.now().isAfter(item.getBidEndTime()))
+                throw new AuctionClosedException("This auction has ended.");
 
-        double minimumBid = item.getCurrentPrice() + item.getPriceStep();
-        if (amount < minimumBid)
-            throw new InvalidBidException(
-                "Bid must be at least " + minimumBid + " (current price " + item.getCurrentPrice() + " + step " + item.getPriceStep() + ")."
-            );
+            if (amount <= 0)
+                throw new InvalidBidException("Bid amount must be positive.");
 
-        double balance = user instanceof Bidder b ? b.getBalance() : ((Seller) user).getBalance();
-        double committed = committedAmount(user.getId(), itemId);
-        double available = balance - committed;
-        if (available < amount)
-            throw new InvalidBidException(
-                "Insufficient available balance: $" + String.format("%.2f", available) +
-                " ($" + String.format("%.2f", balance) + " balance − $" +
-                String.format("%.2f", committed) + " committed to other bids), need $" +
-                String.format("%.2f", amount) + ".");
+            double minimumBid = item.getCurrentPrice() + item.getPriceStep();
+            if (amount < minimumBid)
+                throw new InvalidBidException(
+                    "Bid must be at least " + minimumBid + " (current price " + item.getCurrentPrice() + " + step " + item.getPriceStep() + ")."
+                );
 
-        item.setCurrentPrice(amount);
-        item.setCurrentWinnerId(user.getId());
-        return new Bid(user.getId(), itemId, amount);
+            double balance = user instanceof Bidder b ? b.getBalance() : ((Seller) user).getBalance();
+            double committed = committedAmount(user.getId(), itemId);
+            double available = balance - committed;
+            if (available < amount)
+                throw new InvalidBidException(
+                    "Insufficient available balance: $" + String.format("%.2f", available) +
+                    " ($" + String.format("%.2f", balance) + " balance − $" +
+                    String.format("%.2f", committed) + " committed to other bids), need $" +
+                    String.format("%.2f", amount) + ".");
+
+            item.setCurrentPrice(amount);
+            item.setCurrentWinnerId(user.getId());
+            itemRepository.update(item);
+            return new Bid(user.getId(), itemId, amount);
+        }
     }
 
     /** Sum of currentPrice for all RUNNING items where this user is currently winning, excluding one item. */

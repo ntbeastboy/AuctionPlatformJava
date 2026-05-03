@@ -10,18 +10,18 @@ public class Bidder extends BannableUser {
 
     public double getBalance() { return balance; }
 
-    public void addFunds(double amount) {
+    public synchronized void addFunds(double amount) {
         if (amount <= 0) throw new IllegalArgumentException("Amount must be positive.");
         balance += amount;
     }
 
-    public void withdraw(double amount) {
+    public synchronized void withdraw(double amount) {
         if (amount <= 0) throw new IllegalArgumentException("Amount must be positive.");
         if (amount > balance) throw new IllegalArgumentException("Insufficient balance.");
         balance -= amount;
     }
 
-    public void deductFunds(double amount) {
+    public synchronized void deductFunds(double amount) {
         if (amount <= 0) throw new IllegalArgumentException("Amount must be positive.");
         if (amount > balance) throw new IllegalArgumentException("Insufficient balance.");
         balance -= amount;
