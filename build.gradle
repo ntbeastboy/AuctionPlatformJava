@@ -10,6 +10,11 @@ version = '1.0-SNAPSHOT'
 java {
     sourceCompatibility = JavaVersion.VERSION_21
     targetCompatibility = JavaVersion.VERSION_21
+    // Supports Java 25+
+}
+
+tasks.withType(JavaCompile) {
+    options.encoding = 'UTF-8'
 }
 
 application {
@@ -26,8 +31,37 @@ repositories {
 }
 
 dependencies {
+    implementation 'org.openjfx:javafx-controls:21'
+    implementation 'org.openjfx:javafx-fxml:21'
+    implementation 'org.openjfx:javafx-graphics:21'
+
+    // HTTP Client
+    implementation 'com.squareup.okhttp3:okhttp:4.11.0'
+    implementation 'com.google.code.gson:gson:2.10.1'
+
+    // SQLite Database
+    implementation 'org.xerial:sqlite-jdbc:3.45.1.0'
+
+    // Embedded HTTP Server
+    implementation 'io.javalin:javalin:6.4.0'
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.17.0'
+    implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.17.0'
+
+    // SLF4J (required by Javalin)
+    implementation 'org.slf4j:slf4j-simple:2.0.12'
+
     testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+run {
+    doFirst {
+        systemProperties System.getProperties()
+    }
+    jvmArgs = [
+            '--enable-native-access=javafx.graphics',
+            '--add-opens=java.base/java.lang=ALL-UNNAMED'
+    ]
 }
 
 test {
