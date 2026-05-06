@@ -11,11 +11,14 @@ import com.auction.model.Seller;
 import com.auction.model.User;
 import com.auction.repository.ItemRepository;
 import com.auction.repository.UserRepository;
+import com.auction.server.ItemLockManager;
+
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.ReentrantLock;
 
 public class AuctionService {
 
@@ -33,19 +36,18 @@ public class AuctionService {
         this.userRepository = userRepository;
     }
 
-    /**
-     * OPEN → RUNNING
-     * Admins can start any auction; a Seller can only start their own.
-     */
     public void startAuction(String itemId, User requestingUser) {
-        Item item = getItem(itemId);
-
         boolean isAdmin = requestingUser instanceof Admin;
-        boolean isOwner = requestingUser instanceof Seller && item.getSellerId().equals(requestingUser.getId());
-        if (!isAdmin && !isOwner)
-            throw new UnauthorizedActionException("Only the item's seller or an admin can start this auction.");
 
-        synchronized(item) {
+        ReentrantLock lock = ItemLockManager.getLock(itemId);
+        lock.lock();
+        try {
+            Item item = getItem(itemId);
+
+            boolean isOwner = requestingUser instanceof Seller && item.getSellerId().equals(requestingUser.getId());
+            if (!isAdmin && !isOwner)
+                throw new UnauthorizedActionException("Only the item's seller or an admin can start this auction.");
+
             if (item.getStatus() != AuctionStatus.OPEN)
                 throw new IllegalStateException(
                         "Auction must be OPEN to start. Current status: " + item.getStatus());
@@ -64,20 +66,17 @@ public class AuctionService {
             } else {
                 scheduler.schedule(() -> closeAuction(itemId), delayMs, TimeUnit.MILLISECONDS);
             }
+        } finally {
+            lock.unlock();
         }
     }
 
-    /**
-     * RUNNING → FINISHED (if bids exist) or CANCELED (if no bids were placed).
-     * Called automatically by the scheduler when bidEndTime is reached,
-     * or manually by an admin via endAuctionEarly(). The current winner
-     * (highest bidder) is already tracked on the item by ItemService.placeBid.
-     */
     public void closeAuction(String itemId) {
-        Item item = getItem(itemId);
+        ReentrantLock lock = ItemLockManager.getLock(itemId);
+        lock.lock();
+        try {
+            Item item = getItem(itemId);
 
-        // Guard against double-close (e.g. scheduler fires after admin already closed it)
-        synchronized(item) {
             if (item.getStatus() != AuctionStatus.RUNNING)
                 return;
 
@@ -89,18 +88,17 @@ public class AuctionService {
 
             itemRepository.update(item);
             if (statusChangeCallback != null) statusChangeCallback.run();
+        } finally {
+            lock.unlock();
         }
     }
 
-    /**
-     * FINISHED → PAID
-     * Only the winner (or admin) can confirm payment.
-     * Deducts the winning price from the winner's balance and credits the seller.
-     */
     public void markPaid(String itemId, User requestingUser) {
-        Item item = getItem(itemId);
+        ReentrantLock lock = ItemLockManager.getLock(itemId);
+        lock.lock();
+        try {
+            Item item = getItem(itemId);
 
-        synchronized(item) {
             if (item.getStatus() != AuctionStatus.FINISHED)
                 throw new IllegalStateException(
                         "Auction must be FINISHED before marking PAID. Current status: " + item.getStatus());
@@ -135,6 +133,7 @@ public class AuctionService {
             double winningPrice = item.getCurrentPrice();
             if (winnerBalance < winningPrice) {
                 item.setStatus(AuctionStatus.CANCELED);
+                itemRepository.update(item);
                 throw new InvalidBidException(
                         "Winner has insufficient balance (" + winnerBalance +
                                 ") to pay " + winningPrice + ". Auction canceled.");
@@ -142,35 +141,30 @@ public class AuctionService {
 
             if (winnerUser instanceof Bidder bidderWinner) bidderWinner.deductFunds(winningPrice);
             else ((Seller) winnerUser).withdraw(winningPrice);
-            ((Seller) sellerUser).addFunds(winningPrice);
+            seller.addFunds(winningPrice);
             item.setStatus(AuctionStatus.PAID);
             itemRepository.update(item);
             userRepository.save(winnerUser);
             userRepository.save(sellerUser);
+        } finally {
+            lock.unlock();
         }
     }
 
-    /**
-     * RUNNING → FINISHED or CANCELED (admin only, immediate).
-     * Delegates to closeAuction so the no-bids rule is applied consistently.
-     */
     public void endAuctionEarly(String itemId, User requestingUser) {
         if (!(requestingUser instanceof Admin))
             throw new UnauthorizedActionException("Only admins can end auctions early.");
         closeAuction(itemId);
     }
 
-    /**
-     * OPEN / RUNNING / FINISHED → CANCELED (admin only)
-     * A PAID auction cannot be canceled.
-     */
     public void cancelAuction(String itemId, User requestingUser) {
         if (!(requestingUser instanceof Admin))
             throw new UnauthorizedActionException("Only admins can cancel auctions.");
 
-        Item item = getItem(itemId);
-
-        synchronized(item) {
+        ReentrantLock lock = ItemLockManager.getLock(itemId);
+        lock.lock();
+        try {
+            Item item = getItem(itemId);
             AuctionStatus current = item.getStatus();
 
             if (current == AuctionStatus.PAID)
@@ -180,10 +174,11 @@ public class AuctionService {
 
             item.setStatus(AuctionStatus.CANCELED);
             itemRepository.update(item);
+        } finally {
+            lock.unlock();
         }
     }
 
-    /** Shuts down the background scheduler (call on application exit). */
     public void shutdown() {
         scheduler.shutdownNow();
     }

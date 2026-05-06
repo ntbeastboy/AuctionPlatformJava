@@ -9,6 +9,7 @@ public class BidRemoteDto {
     private String bidderName;
     private Double bidAmount;
     private LocalDateTime bidTime;
+    private Long timestamp;
 
     public BidRemoteDto() {}
 
@@ -33,4 +34,6 @@ public class BidRemoteDto {
     public void setBidAmount(Double bidAmount) { this.bidAmount = bidAmount; }
     public LocalDateTime getBidTime() { return bidTime; }
     public void setBidTime(LocalDateTime bidTime) { this.bidTime = bidTime; }
+    public Long getTimestamp() { return timestamp; }
+    public void setTimestamp(Long timestamp) { this.timestamp = timestamp; }
 }

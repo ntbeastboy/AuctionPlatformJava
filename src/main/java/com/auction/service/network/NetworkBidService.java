@@ -22,7 +22,7 @@ public class NetworkBidService {
         bidData.put("itemId", itemId);
         bidData.put("bidAmount", bidAmount);
 
-        String response = httpClient.post("/bids?bidderId=" + bidderId, httpClient.getGson().toJson(bidData));
+        String response = httpClient.post("/bids", httpClient.getGson().toJson(bidData));
         return httpClient.getGson().fromJson(response, BidRemoteDto.class);
     }
 

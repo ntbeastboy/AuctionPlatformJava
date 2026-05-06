@@ -8,6 +8,7 @@ public class UserRemoteDto {
     private String role;
     private Double balance;
     private Boolean banned;
+    private String token;
 
     public UserRemoteDto() {}
     
@@ -35,4 +36,6 @@ public class UserRemoteDto {
     public void setBalance(Double balance) { this.balance = balance; }
     public Boolean getBanned() { return banned; }
     public void setBanned(Boolean banned) { this.banned = banned; }
+    public String getToken() { return token; }
+    public void setToken(String token) { this.token = token; }
 }

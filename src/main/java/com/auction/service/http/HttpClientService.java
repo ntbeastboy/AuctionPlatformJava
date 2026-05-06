@@ -13,6 +13,7 @@ public class HttpClientService {
     private static final String BASE_URL = "http://localhost:8080/api";
     private final OkHttpClient httpClient;
     private final Gson gson;
+    private String authToken;
 
     public HttpClientService() {
         this.httpClient = new OkHttpClient.Builder()
@@ -23,12 +24,20 @@ public class HttpClientService {
         this.gson = new Gson();
     }
 
-    public String get(String endpoint) throws IOException {
-        Request request = new Request.Builder()
-                .url(BASE_URL + endpoint)
-                .build();
+    public void setAuthToken(String token) {
+        this.authToken = token;
+    }
 
-        try (Response response = httpClient.newCall(request).execute()) {
+    public String getAuthToken() {
+        return authToken;
+    }
+
+    public String get(String endpoint) throws IOException {
+        Request.Builder builder = new Request.Builder()
+                .url(BASE_URL + endpoint);
+        addAuth(builder);
+
+        try (Response response = httpClient.newCall(builder.build()).execute()) {
             if (!response.isSuccessful()) {
                 String errorBody = response.body() != null ? response.body().string() : "Unknown error";
                 throw new IOException("HTTP " + response.code() + ": " + errorBody);
@@ -41,12 +50,12 @@ public class HttpClientService {
         okhttp3.MediaType mediaType = okhttp3.MediaType.parse("application/json; charset=utf-8");
         okhttp3.RequestBody body = okhttp3.RequestBody.create(jsonBody, mediaType);
 
-        Request request = new Request.Builder()
+        Request.Builder builder = new Request.Builder()
                 .url(BASE_URL + endpoint)
-                .post(body)
-                .build();
+                .post(body);
+        addAuth(builder);
 
-        try (Response response = httpClient.newCall(request).execute()) {
+        try (Response response = httpClient.newCall(builder.build()).execute()) {
             if (!response.isSuccessful()) {
                 String errorBody = response.body() != null ? response.body().string() : "Unknown error";
                 throw new IOException("HTTP " + response.code() + ": " + errorBody);
@@ -59,12 +68,12 @@ public class HttpClientService {
         okhttp3.MediaType mediaType = okhttp3.MediaType.parse("application/json; charset=utf-8");
         okhttp3.RequestBody body = okhttp3.RequestBody.create(jsonBody, mediaType);
 
-        Request request = new Request.Builder()
+        Request.Builder builder = new Request.Builder()
                 .url(BASE_URL + endpoint)
-                .put(body)
-                .build();
+                .put(body);
+        addAuth(builder);
 
-        try (Response response = httpClient.newCall(request).execute()) {
+        try (Response response = httpClient.newCall(builder.build()).execute()) {
             if (!response.isSuccessful()) {
                 String errorBody = response.body() != null ? response.body().string() : "Unknown error";
                 throw new IOException("HTTP " + response.code() + ": " + errorBody);
@@ -75,5 +84,11 @@ public class HttpClientService {
 
     public Gson getGson() {
         return gson;
+    }
+
+    private void addAuth(Request.Builder builder) {
+        if (authToken != null && !authToken.isBlank()) {
+            builder.addHeader("Authorization", "Bearer " + authToken);
+        }
     }
 }

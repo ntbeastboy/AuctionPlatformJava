@@ -22,19 +22,21 @@ public class NetworkUserService {
         loginData.put("password", password);
 
         String response = httpClient.post("/users/login", httpClient.getGson().toJson(loginData));
-        return httpClient.getGson().fromJson(response, UserRemoteDto.class);
+        UserRemoteDto dto = httpClient.getGson().fromJson(response, UserRemoteDto.class);
+        if (dto.getToken() != null) httpClient.setAuthToken(dto.getToken());
+        return dto;
     }
 
-    public UserRemoteDto register(String username, String password, String email, String fullName, String role) throws IOException {
+    public UserRemoteDto register(String username, String password, String role) throws IOException {
         Map<String, String> registerData = new HashMap<>();
         registerData.put("username", username);
         registerData.put("password", password);
-        registerData.put("email", email);
-        registerData.put("fullName", fullName);
         registerData.put("role", role);
 
         String response = httpClient.post("/users/register", httpClient.getGson().toJson(registerData));
-        return httpClient.getGson().fromJson(response, UserRemoteDto.class);
+        UserRemoteDto dto = httpClient.getGson().fromJson(response, UserRemoteDto.class);
+        if (dto.getToken() != null) httpClient.setAuthToken(dto.getToken());
+        return dto;
     }
 
     public UserRemoteDto getUserById(String id) throws IOException {

@@ -64,6 +64,15 @@ run {
     ]
 }
 
+task runServer(type: JavaExec) {
+    description = 'Run the standalone auction API server'
+    mainClass = 'com.auction.server.ServerMain'
+    classpath = sourceSets.main.runtimeClasspath
+    doFirst {
+        systemProperties System.getProperties()
+    }
+}
+
 test {
     useJUnitPlatform()
 }

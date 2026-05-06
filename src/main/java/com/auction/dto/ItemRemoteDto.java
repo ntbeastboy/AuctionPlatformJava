@@ -10,6 +10,11 @@ public class ItemRemoteDto {
     private String sellerId;
     private String sellerName;
     private String status;
+    private Double priceStep;
+    private String currentWinnerId;
+    private String bidStartTime;
+    private String bidEndTime;
+    private String type;
 
     public ItemRemoteDto() {}
 
@@ -43,4 +48,14 @@ public class ItemRemoteDto {
     public void setSellerName(String sellerName) { this.sellerName = sellerName; }
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
+    public Double getPriceStep() { return priceStep; }
+    public void setPriceStep(Double priceStep) { this.priceStep = priceStep; }
+    public String getCurrentWinnerId() { return currentWinnerId; }
+    public void setCurrentWinnerId(String currentWinnerId) { this.currentWinnerId = currentWinnerId; }
+    public String getBidStartTime() { return bidStartTime; }
+    public void setBidStartTime(String bidStartTime) { this.bidStartTime = bidStartTime; }
+    public String getBidEndTime() { return bidEndTime; }
+    public void setBidEndTime(String bidEndTime) { this.bidEndTime = bidEndTime; }
+    public String getType() { return type; }
+    public void setType(String type) { this.type = type; }
 }

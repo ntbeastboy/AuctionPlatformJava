@@ -7,10 +7,14 @@ public class Bid {
     private final long timestamp;
 
     public Bid(String bidderId, String itemId, double amount) {
+        this(bidderId, itemId, amount, System.currentTimeMillis() / 1000L);
+    }
+
+    public Bid(String bidderId, String itemId, double amount, long timestamp) {
         this.bidderId = bidderId;
         this.itemId = itemId;
         this.amount = amount;
-        this.timestamp = System.currentTimeMillis() / 1000L;
+        this.timestamp = timestamp;
     }
 
     public String getBidderId() { return bidderId; }

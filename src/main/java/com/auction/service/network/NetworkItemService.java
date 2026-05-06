@@ -24,7 +24,7 @@ public class NetworkItemService {
         itemData.put("category", category);
         itemData.put("startPrice", startPrice);
 
-        String response = httpClient.post("/items?sellerId=" + sellerId, httpClient.getGson().toJson(itemData));
+        String response = httpClient.post("/items", httpClient.getGson().toJson(itemData));
         return httpClient.getGson().fromJson(response, ItemRemoteDto.class);
     }
 
