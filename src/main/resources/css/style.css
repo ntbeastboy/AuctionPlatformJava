@@ -1,58 +1,251 @@
+/* ==========================================================================
+   Auction Platform — modern theme
+   Palette inspired by neutral slate + indigo accent.
+   All existing selectors are preserved so no FXML changes are required.
+   ========================================================================== */
+
+* {
+    /* Design tokens — referenced via -fx-* lookups below. */
+    -accent:        #4f46e5;   /* indigo-600  */
+    -accent-hover:  #4338ca;   /* indigo-700  */
+    -accent-soft:   #eef2ff;   /* indigo-50   */
+    -ink:           #0f172a;   /* slate-900   */
+    -ink-muted:     #475569;   /* slate-600   */
+    -ink-faint:     #94a3b8;   /* slate-400   */
+    -surface:       #ffffff;
+    -surface-alt:   #f8fafc;   /* slate-50    */
+    -surface-line:  #e2e8f0;   /* slate-200   */
+    -danger:        #dc2626;   /* red-600     */
+    -danger-hover:  #b91c1c;
+    -success:       #16a34a;   /* green-600   */
+}
+
+/* ---------- Root / typography ---------- */
 .root-pane {
-    -fx-background-color: #f4f6f8;
-    -fx-font-family: "Segoe UI", sans-serif;
+    -fx-background-color: linear-gradient(to bottom, #f8fafc 0%, #eef2ff 100%);
+    -fx-font-family: "Segoe UI", "Inter", "Helvetica Neue", sans-serif;
     -fx-font-size: 13px;
+    -fx-text-fill: -ink;
 }
 
 .title {
-    -fx-font-size: 22px;
-    -fx-font-weight: bold;
-    -fx-fill: #2c3e50;
+    -fx-font-size: 26px;
+    -fx-font-weight: 700;
+    -fx-fill: -ink;
 }
 
+.label { -fx-text-fill: -ink; }
+
+/* ---------- Header bar ---------- */
 .header-bar {
-    -fx-background-color: #2c3e50;
-    -fx-padding: 8 12 8 12;
-    -fx-background-radius: 6;
+    -fx-background-color: -surface;
+    -fx-background-radius: 12;
+    -fx-padding: 12 18 12 18;
+    -fx-border-color: -surface-line;
+    -fx-border-radius: 12;
+    -fx-effect: dropshadow(gaussian, rgba(15, 23, 42, 0.06), 12, 0, 0, 2);
 }
 
 .user-info {
-    -fx-text-fill: white;
+    -fx-text-fill: -ink;
     -fx-font-size: 13px;
-    -fx-font-weight: bold;
+    -fx-font-weight: 600;
 }
 
-/* Buttons */
-.button { -fx-cursor: hand; -fx-background-radius: 5; -fx-padding: 6 14 6 14; -fx-font-size: 12px; }
+/* ---------- Buttons ---------- */
+.button {
+    -fx-cursor: hand;
+    -fx-background-radius: 8;
+    -fx-border-radius: 8;
+    -fx-padding: 8 16 8 16;
+    -fx-font-size: 12.5px;
+    -fx-font-weight: 600;
+    -fx-background-insets: 0;
+    -fx-border-width: 0;
+    -fx-effect: dropshadow(gaussian, rgba(15, 23, 42, 0.05), 4, 0, 0, 1);
+}
+.button:focused {
+    -fx-effect: dropshadow(gaussian, rgba(79, 70, 229, 0.45), 8, 0.2, 0, 0);
+}
 
-.btn-primary   { -fx-background-color: #2980b9; -fx-text-fill: white; }
-.btn-primary:hover { -fx-background-color: #1f6391; }
+.btn-primary {
+    -fx-background-color: -accent;
+    -fx-text-fill: white;
+}
+.btn-primary:hover  { -fx-background-color: -accent-hover; }
+.btn-primary:armed  { -fx-background-color: derive(-accent-hover, -8%); }
 
-.btn-secondary { -fx-background-color: #7f8c8d; -fx-text-fill: white; }
-.btn-secondary:hover { -fx-background-color: #616a6b; }
+.btn-secondary {
+    -fx-background-color: -surface;
+    -fx-text-fill: -ink;
+    -fx-border-color: -surface-line;
+    -fx-border-width: 1;
+}
+.btn-secondary:hover { -fx-background-color: -surface-alt; -fx-border-color: -ink-faint; }
+.btn-secondary:armed { -fx-background-color: -surface-line; }
 
-.btn-danger    { -fx-background-color: #c0392b; -fx-text-fill: white; }
-.btn-danger:hover { -fx-background-color: #922b21; }
+.btn-danger {
+    -fx-background-color: -danger;
+    -fx-text-fill: white;
+}
+.btn-danger:hover { -fx-background-color: -danger-hover; }
+.btn-danger:armed { -fx-background-color: derive(-danger-hover, -8%); }
 
-/* Table */
-.item-table { -fx-background-color: white; -fx-border-color: #dce0e4; -fx-border-radius: 5; }
-.table-row-cell:selected { -fx-background-color: #d6eaf8; }
+/* ---------- Table ---------- */
+.item-table {
+    -fx-background-color: -surface;
+    -fx-background-radius: 12;
+    -fx-border-color: -surface-line;
+    -fx-border-radius: 12;
+    -fx-padding: 0;
+    -fx-effect: dropshadow(gaussian, rgba(15, 23, 42, 0.06), 12, 0, 0, 2);
+}
+.item-table .column-header-background {
+    -fx-background-color: -surface-alt;
+    -fx-background-radius: 12 12 0 0;
+}
+.item-table .column-header,
+.item-table .filler {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent transparent -surface-line transparent;
+    -fx-border-width: 0 0 1 0;
+    -fx-padding: 10 12 10 12;
+}
+.item-table .column-header .label {
+    -fx-text-fill: -ink-muted;
+    -fx-font-weight: 700;
+    -fx-font-size: 11.5px;
+    -fx-alignment: CENTER_LEFT;
+}
+.item-table .table-cell {
+    -fx-padding: 10 12 10 12;
+    -fx-border-color: transparent;
+    -fx-text-fill: -ink;
+}
+.item-table .table-row-cell {
+    -fx-background-color: -surface;
+    -fx-border-color: transparent transparent -surface-line transparent;
+    -fx-border-width: 0 0 1 0;
+}
+.item-table .table-row-cell:odd  { -fx-background-color: -surface-alt; }
+.item-table .table-row-cell:selected {
+    -fx-background-color: -accent-soft;
+    -fx-text-fill: -ink;
+}
+.item-table .table-row-cell:selected .table-cell { -fx-text-fill: -ink; }
+.item-table .table-row-cell:empty { -fx-background-color: -surface; -fx-border-color: transparent; }
 
-/* Form labels */
-.detail-key { -fx-font-weight: bold; -fx-text-fill: #555; }
-.detail-val { -fx-text-fill: #2c3e50; }
+/* ---------- Detail labels ---------- */
+.detail-key {
+    -fx-font-weight: 600;
+    -fx-text-fill: -ink-muted;
+    -fx-font-size: 12px;
+}
+.detail-val {
+    -fx-text-fill: -ink;
+    -fx-font-size: 13px;
+}
 
-/* Feedback labels */
-.error-label  { -fx-font-size: 12px; -fx-text-fill: #c0392b; }
-.muted-label  { -fx-font-size: 11px; -fx-text-fill: #7f8c8d; }
+/* ---------- Feedback ---------- */
+.error-label  {
+    -fx-font-size: 12px;
+    -fx-text-fill: -danger;
+    -fx-font-weight: 500;
+}
+.muted-label  {
+    -fx-font-size: 11.5px;
+    -fx-text-fill: -ink-faint;
+}
 
-/* Text fields */
+/* ---------- Inputs ---------- */
 .text-field, .password-field {
-    -fx-background-radius: 4;
-    -fx-border-color: #bdc3c7;
-    -fx-border-radius: 4;
-    -fx-padding: 5 8 5 8;
+    -fx-background-color: -surface;
+    -fx-background-radius: 8;
+    -fx-border-color: -surface-line;
+    -fx-border-radius: 8;
+    -fx-border-width: 1;
+    -fx-padding: 8 12 8 12;
+    -fx-font-size: 13px;
+    -fx-prompt-text-fill: -ink-faint;
 }
 .text-field:focused, .password-field:focused {
-    -fx-border-color: #2980b9;
+    -fx-border-color: -accent;
+    -fx-effect: dropshadow(gaussian, rgba(79, 70, 229, 0.2), 6, 0.2, 0, 0);
+}
+
+/* ---------- Choice / Combo ---------- */
+.combo-box-base {
+    -fx-background-color: -surface;
+    -fx-background-radius: 8;
+    -fx-border-color: -surface-line;
+    -fx-border-radius: 8;
+    -fx-border-width: 1;
+    -fx-padding: 2 4 2 4;
+}
+.combo-box-base:focused { -fx-border-color: -accent; }
+.combo-box-base .arrow-button { -fx-background-color: transparent; }
+.combo-box-base .arrow { -fx-background-color: -ink-muted; }
+.combo-box-popup .list-view {
+    -fx-background-color: -surface;
+    -fx-border-color: -surface-line;
+    -fx-background-radius: 8;
+    -fx-border-radius: 8;
+    -fx-effect: dropshadow(gaussian, rgba(15, 23, 42, 0.12), 16, 0.1, 0, 4);
+}
+.combo-box-popup .list-cell:filled:hover    { -fx-background-color: -accent-soft; -fx-text-fill: -ink; }
+.combo-box-popup .list-cell:filled:selected { -fx-background-color: -accent;       -fx-text-fill: white; }
+
+/* ---------- Radio buttons ---------- */
+.radio-button .radio { -fx-border-color: -ink-faint; -fx-background-color: -surface; }
+.radio-button:selected .radio { -fx-border-color: -accent; }
+.radio-button:selected .dot   { -fx-background-color: -accent; }
+
+/* ---------- Separators ---------- */
+.separator .line {
+    -fx-border-color: -surface-line;
+    -fx-border-width: 1 0 0 0;
+}
+
+/* ---------- Scrollbars (subtle) ---------- */
+.scroll-bar:vertical, .scroll-bar:horizontal {
+    -fx-background-color: transparent;
+    -fx-padding: 2;
+}
+.scroll-bar .thumb {
+    -fx-background-color: -ink-faint;
+    -fx-background-radius: 8;
+    -fx-background-insets: 2;
+}
+.scroll-bar .thumb:hover { -fx-background-color: -ink-muted; }
+.scroll-bar .increment-button,
+.scroll-bar .decrement-button { -fx-background-color: transparent; -fx-padding: 0; }
+.scroll-bar .increment-arrow,
+.scroll-bar .decrement-arrow  { -fx-shape: " "; -fx-padding: 0; }
+
+/* ---------- Dialogs (Add Funds, Create Item, etc.) ---------- */
+.dialog-pane {
+    -fx-background-color: -surface;
+    -fx-background-radius: 12;
+    -fx-border-color: -surface-line;
+    -fx-border-radius: 12;
+    -fx-padding: 12;
+}
+.dialog-pane > .header-panel {
+    -fx-background-color: transparent;
+    -fx-padding: 4 4 12 4;
+}
+.dialog-pane > .header-panel .label {
+    -fx-font-size: 16px;
+    -fx-font-weight: 700;
+    -fx-text-fill: -ink;
+}
+.dialog-pane > .button-bar > .container { -fx-spacing: 8; }
+.dialog-pane .button { -fx-background-color: -surface; -fx-text-fill: -ink; -fx-border-color: -surface-line; -fx-border-width: 1; }
+.dialog-pane .button:default { -fx-background-color: -accent; -fx-text-fill: white; -fx-border-color: transparent; }
+.dialog-pane .button:default:hover { -fx-background-color: -accent-hover; }
+.dialog-pane .content { -fx-padding: 4 4 8 4; }
+
+/* ---------- Status / hover transitions (JavaFX CSS subset) ---------- */
+.button, .text-field, .password-field, .combo-box-base {
+    -fx-transition: background-color 120ms;
 }

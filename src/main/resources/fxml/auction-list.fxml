@@ -4,8 +4,8 @@
 <?import javafx.scene.layout.*?>
 
 <VBox xmlns:fx="http://javafx.com/fxml" fx:controller="com.auction.controller.AuctionListController"
-      spacing="10" styleClass="root-pane">
-    <padding><Insets topRightBottomLeft="14"/></padding>
+      spacing="14" styleClass="root-pane">
+    <padding><Insets topRightBottomLeft="20"/></padding>
 
     <!-- Header -->
     <HBox alignment="CENTER_LEFT" spacing="12" styleClass="header-bar">

@@ -6,7 +6,7 @@
 
 <VBox xmlns:fx="http://javafx.com/fxml" fx:controller="com.auction.controller.LoginController"
       alignment="CENTER" spacing="14" styleClass="root-pane">
-    <padding><Insets topRightBottomLeft="40"/></padding>
+    <padding><Insets topRightBottomLeft="48"/></padding>
 
     <Text text="Auction Platform" styleClass="title"/>
 
