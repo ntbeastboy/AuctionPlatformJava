@@ -2,6 +2,7 @@ package com.auction.repository;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 
@@ -13,7 +14,13 @@ public class DatabaseManager {
         try {
             connection = DriverManager.getConnection("jdbc:sqlite:" + dbPath);
             connection.setAutoCommit(true);
+            try (Statement stmt = connection.createStatement()) {
+                // Enforce FKs and use WAL for better read/write concurrency.
+                stmt.execute("PRAGMA foreign_keys = ON");
+                stmt.execute("PRAGMA journal_mode = WAL");
+            }
             createTables();
+            migrate();
         } catch (SQLException e) {
             throw new RuntimeException("Failed to initialize SQLite database: " + e.getMessage(), e);
         }
@@ -21,6 +28,37 @@ public class DatabaseManager {
 
     public Connection getConnection() {
         return connection;
+    }
+
+    /**
+     * Run the given action inside a SQLite transaction. Commits on normal
+     * return; rolls back on any thrown exception. Synchronizes on the single
+     * shared {@link Connection} so callers don't trample each other's
+     * autoCommit state.
+     */
+    public synchronized void inTransaction(TxAction action) {
+        boolean prevAutoCommit;
+        try {
+            prevAutoCommit = connection.getAutoCommit();
+            connection.setAutoCommit(false);
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to begin transaction: " + e.getMessage(), e);
+        }
+        try {
+            action.run();
+            connection.commit();
+        } catch (RuntimeException | SQLException ex) {
+            try { connection.rollback(); } catch (SQLException ignored) {}
+            if (ex instanceof RuntimeException re) throw re;
+            throw new RuntimeException("Transaction failed: " + ex.getMessage(), ex);
+        } finally {
+            try { connection.setAutoCommit(prevAutoCommit); } catch (SQLException ignored) {}
+        }
+    }
+
+    @FunctionalInterface
+    public interface TxAction {
+        void run() throws SQLException;
     }
 
     private void createTables() throws SQLException {
@@ -63,7 +101,8 @@ public class DatabaseManager {
                     manufacturing_date TEXT,
                     brand TEXT,
                     vin TEXT,
-                    accident_history INTEGER DEFAULT 0
+                    accident_history INTEGER DEFAULT 0,
+                    version INTEGER NOT NULL DEFAULT 0
                 )
             """);
 
@@ -76,6 +115,31 @@ public class DatabaseManager {
                     timestamp INTEGER NOT NULL
                 )
             """);
+
+            stmt.executeUpdate("CREATE INDEX IF NOT EXISTS idx_bids_item_id ON bids(item_id)");
+            stmt.executeUpdate("CREATE INDEX IF NOT EXISTS idx_bids_bidder_id ON bids(bidder_id)");
+        }
+    }
+
+    /**
+     * Backfill schema changes for databases created by older builds.
+     * Currently: ensures the items.version column exists.
+     */
+    private void migrate() throws SQLException {
+        if (!columnExists("items", "version")) {
+            try (Statement stmt = connection.createStatement()) {
+                stmt.executeUpdate("ALTER TABLE items ADD COLUMN version INTEGER NOT NULL DEFAULT 0");
+            }
+        }
+    }
+
+    private boolean columnExists(String table, String column) throws SQLException {
+        try (Statement stmt = connection.createStatement();
+             ResultSet rs = stmt.executeQuery("PRAGMA table_info(" + table + ")")) {
+            while (rs.next()) {
+                if (column.equalsIgnoreCase(rs.getString("name"))) return true;
+            }
+            return false;
         }
     }
 

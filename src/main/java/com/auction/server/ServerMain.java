@@ -32,8 +32,12 @@ public class ServerMain {
         // Services
         UserService userService = new UserService(userRepo);
         ItemService itemService = new ItemService(itemRepo);
-        BidService bidService = new BidService(itemRepo, bidRepo, userRepo);
-        AuctionService auctionService = new AuctionService(itemRepo, userRepo);
+        BidService bidService = new BidService(itemRepo, bidRepo, userRepo, db);
+        AuctionService auctionService = new AuctionService(itemRepo, userRepo, db);
+
+        // Recover any RUNNING auctions left over from a previous server run:
+        // close those whose end-time has passed, reschedule the rest.
+        auctionService.recoverScheduledAuctions();
 
         // Seed admin account with hashed password (recreate DB if upgrading from plaintext)
         if (!userRepo.existsByUsername("admin")) {

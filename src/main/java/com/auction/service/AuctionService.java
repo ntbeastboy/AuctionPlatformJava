@@ -9,6 +9,7 @@ import com.auction.model.Bidder;
 import com.auction.model.Item;
 import com.auction.model.Seller;
 import com.auction.model.User;
+import com.auction.repository.DatabaseManager;
 import com.auction.repository.ItemRepository;
 import com.auction.repository.UserRepository;
 import com.auction.server.ItemLockManager;
@@ -24,6 +25,7 @@ public class AuctionService {
 
     private final ItemRepository itemRepository;
     private final UserRepository userRepository;
+    private final DatabaseManager dbManager;
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(4);
     private Runnable statusChangeCallback;
 
@@ -31,9 +33,44 @@ public class AuctionService {
         this.statusChangeCallback = callback;
     }
 
-    public AuctionService(ItemRepository itemRepository, UserRepository userRepository) {
+    public AuctionService(ItemRepository itemRepository, UserRepository userRepository,
+                          DatabaseManager dbManager) {
         this.itemRepository = itemRepository;
         this.userRepository = userRepository;
+        this.dbManager = dbManager;
+    }
+
+    /** Backwards-compatible constructor for in-memory tests / non-SQLite repos. */
+    public AuctionService(ItemRepository itemRepository, UserRepository userRepository) {
+        this(itemRepository, userRepository, null);
+    }
+
+    private void runInTx(Runnable action) {
+        if (dbManager != null) {
+            dbManager.inTransaction(action::run);
+        } else {
+            action.run();
+        }
+    }
+
+    /**
+     * Recover from server restarts: any auction left in RUNNING status whose
+     * end-time has already passed is closed immediately; any still-active
+     * RUNNING auction has its close timer rescheduled.
+     */
+    public void recoverScheduledAuctions() {
+        LocalDateTime now = LocalDateTime.now();
+        for (Item item : itemRepository.findAll()) {
+            if (item.getStatus() != AuctionStatus.RUNNING) continue;
+            if (item.getBidEndTime() == null || !now.isBefore(item.getBidEndTime())) {
+                // Already past the end time -> close now.
+                closeAuction(item.getId());
+            } else {
+                long delayMs = Duration.between(now, item.getBidEndTime()).toMillis();
+                String itemId = item.getId();
+                scheduler.schedule(() -> closeAuction(itemId), delayMs, TimeUnit.MILLISECONDS);
+            }
+        }
     }
 
     public void startAuction(String itemId, User requestingUser) {
@@ -60,7 +97,7 @@ public class AuctionService {
             item.setBidEndTime(now.plus(dur));
 
             long delayMs = dur.toMillis();
-            itemRepository.update(item);
+            runInTx(() -> itemRepository.update(item));
             if (delayMs <= 0) {
                 closeAuction(itemId);
             } else {
@@ -86,7 +123,7 @@ public class AuctionService {
                 item.setStatus(AuctionStatus.FINISHED);
             }
 
-            itemRepository.update(item);
+            runInTx(() -> itemRepository.update(item));
             if (statusChangeCallback != null) statusChangeCallback.run();
         } finally {
             lock.unlock();
@@ -133,7 +170,7 @@ public class AuctionService {
             double winningPrice = item.getCurrentPrice();
             if (winnerBalance < winningPrice) {
                 item.setStatus(AuctionStatus.CANCELED);
-                itemRepository.update(item);
+                runInTx(() -> itemRepository.update(item));
                 throw new InvalidBidException(
                         "Winner has insufficient balance (" + winnerBalance +
                                 ") to pay " + winningPrice + ". Auction canceled.");
@@ -143,9 +180,13 @@ public class AuctionService {
             else ((Seller) winnerUser).withdraw(winningPrice);
             seller.addFunds(winningPrice);
             item.setStatus(AuctionStatus.PAID);
-            itemRepository.update(item);
-            userRepository.save(winnerUser);
-            userRepository.save(sellerUser);
+            // Atomic: item status flip + winner debit + seller credit must all
+            // commit together, or none of them.
+            runInTx(() -> {
+                itemRepository.update(item);
+                userRepository.save(winnerUser);
+                userRepository.save(sellerUser);
+            });
         } finally {
             lock.unlock();
         }
@@ -173,7 +214,7 @@ public class AuctionService {
                 throw new IllegalStateException("Auction is already CANCELED.");
 
             item.setStatus(AuctionStatus.CANCELED);
-            itemRepository.update(item);
+            runInTx(() -> itemRepository.update(item));
         } finally {
             lock.unlock();
         }

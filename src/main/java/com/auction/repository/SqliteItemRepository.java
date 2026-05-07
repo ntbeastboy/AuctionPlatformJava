@@ -1,5 +1,6 @@
 package com.auction.repository;
 
+import com.auction.exception.StaleObjectException;
 import com.auction.model.*;
 
 import java.sql.*;
@@ -26,11 +27,12 @@ public class SqliteItemRepository implements ItemRepository {
                 bid_start_time, bid_end_time, seller_id, status, current_winner_id,
                 item_type, category, item_condition, artist, painting_style, origin,
                 wattage, warranty_months, serial_number, miles, manufacturing_date,
-                brand, vin, accident_history
-            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                brand, vin, accident_history, version
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         """;
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             setItemParams(ps, item);
+            ps.setLong(26, item.getVersion());
             ps.executeUpdate();
         } catch (SQLException e) {
             throw new RuntimeException("Failed to save item: " + e.getMessage(), e);
@@ -74,22 +76,62 @@ public class SqliteItemRepository implements ItemRepository {
 
     @Override
     public void update(Item item) {
-        save(item); // INSERT OR REPLACE handles upsert
+        // Optimistic concurrency control: only update if the on-disk version
+        // matches the in-memory version we read. Increment version on success.
+        // This guards against lost updates and rolled-back prices even across
+        // multiple JVMs sharing the same database file.
+        String sql = """
+            UPDATE items SET
+                name = ?, description = ?, starting_price = ?, current_price = ?,
+                price_step = ?, bid_start_time = ?, bid_end_time = ?, seller_id = ?,
+                status = ?, current_winner_id = ?, item_type = ?, category = ?,
+                item_condition = ?, artist = ?, painting_style = ?, origin = ?,
+                wattage = ?, warranty_months = ?, serial_number = ?, miles = ?,
+                manufacturing_date = ?, brand = ?, vin = ?, accident_history = ?,
+                version = version + 1
+            WHERE id = ? AND version = ?
+        """;
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            setUpdateParams(ps, item);
+            ps.setString(25, item.getId());
+            ps.setLong(26, item.getVersion());
+            int rows = ps.executeUpdate();
+            if (rows == 0) {
+                throw new StaleObjectException(
+                        "Item " + item.getId() + " was modified concurrently (version "
+                                + item.getVersion() + " no longer current).");
+            }
+            item.setVersion(item.getVersion() + 1);
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to update item: " + e.getMessage(), e);
+        }
     }
 
     private void setItemParams(PreparedStatement ps, Item item) throws SQLException {
         ps.setString(1, item.getId());
-        ps.setString(2, item.getName());
-        ps.setString(3, item.getDescription());
-        ps.setDouble(4, item.getStartingPrice());
-        ps.setDouble(5, item.getCurrentPrice());
-        ps.setDouble(6, item.getPriceStep());
-        ps.setString(7, item.getBidStartTime() != null ? item.getBidStartTime().toString() : null);
-        ps.setString(8, item.getBidEndTime() != null ? item.getBidEndTime().toString() : null);
-        ps.setString(9, item.getSellerId());
-        ps.setString(10, item.getStatus().name());
-        ps.setString(11, item.getCurrentWinnerId());
-        ps.setString(12, itemType(item));
+        bindMutableColumns(ps, item, 2);
+    }
+
+    /**
+     * Binds the 24 mutable item columns (everything except id and version)
+     * starting at the given JDBC index.
+     */
+    private void setUpdateParams(PreparedStatement ps, Item item) throws SQLException {
+        bindMutableColumns(ps, item, 1);
+    }
+
+    private void bindMutableColumns(PreparedStatement ps, Item item, int start) throws SQLException {
+        ps.setString(start, item.getName());
+        ps.setString(start + 1, item.getDescription());
+        ps.setDouble(start + 2, item.getStartingPrice());
+        ps.setDouble(start + 3, item.getCurrentPrice());
+        ps.setDouble(start + 4, item.getPriceStep());
+        ps.setString(start + 5, item.getBidStartTime() != null ? item.getBidStartTime().toString() : null);
+        ps.setString(start + 6, item.getBidEndTime() != null ? item.getBidEndTime().toString() : null);
+        ps.setString(start + 7, item.getSellerId());
+        ps.setString(start + 8, item.getStatus().name());
+        ps.setString(start + 9, item.getCurrentWinnerId());
+        ps.setString(start + 10, itemType(item));
 
         // Subtype-specific fields (default null)
         String category = null, condition = null, artist = null, paintingStyle = null, origin = null;
@@ -118,19 +160,19 @@ public class SqliteItemRepository implements ItemRepository {
             accidentHistory = v.hasAccidentHistory() ? 1 : 0;
         }
 
-        ps.setString(13, category);
-        ps.setString(14, condition);
-        ps.setString(15, artist);
-        ps.setString(16, paintingStyle);
-        ps.setString(17, origin);
-        setNullableInt(ps, 18, wattage);
-        setNullableInt(ps, 19, warrantyMonths);
-        ps.setString(20, serialNumber);
-        setNullableInt(ps, 21, miles);
-        ps.setString(22, mfgDate);
-        ps.setString(23, brand);
-        ps.setString(24, vin);
-        ps.setInt(25, accidentHistory);
+        ps.setString(start + 11, category);
+        ps.setString(start + 12, condition);
+        ps.setString(start + 13, artist);
+        ps.setString(start + 14, paintingStyle);
+        ps.setString(start + 15, origin);
+        setNullableInt(ps, start + 16, wattage);
+        setNullableInt(ps, start + 17, warrantyMonths);
+        ps.setString(start + 18, serialNumber);
+        setNullableInt(ps, start + 19, miles);
+        ps.setString(start + 20, mfgDate);
+        ps.setString(start + 21, brand);
+        ps.setString(start + 22, vin);
+        ps.setInt(start + 23, accidentHistory);
     }
 
     private Item mapRow(ResultSet rs) throws SQLException {
@@ -172,6 +214,7 @@ public class SqliteItemRepository implements ItemRepository {
         item.setCurrentPrice(currentPrice);
         item.setStatus(AuctionStatus.valueOf(statusStr));
         item.setCurrentWinnerId(winnerId);
+        item.setVersion(rs.getLong("version"));
         return item;
     }
 

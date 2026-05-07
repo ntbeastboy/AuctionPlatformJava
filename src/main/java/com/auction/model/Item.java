@@ -14,6 +14,7 @@ public abstract class Item implements Entity {
     final String sellerId;
     private AuctionStatus status;
     private String currentWinnerId;
+    private long version;
 
     public Item(String id, String name, String description, double startingPrice, double priceStep, LocalDateTime bidStartTime, LocalDateTime bidEndTime, String sellerId) {
         this.id = id;
@@ -27,6 +28,7 @@ public abstract class Item implements Entity {
         this.sellerId = sellerId;
         this.status = AuctionStatus.OPEN;
         this.currentWinnerId = null;
+        this.version = 0;
     }
 
     @Override
@@ -65,4 +67,8 @@ public abstract class Item implements Entity {
     public String getCurrentWinnerId() { return currentWinnerId; }
 
     public void setCurrentWinnerId(String currentWinnerId) { this.currentWinnerId = currentWinnerId; }
+
+    public long getVersion() { return version; }
+
+    public void setVersion(long version) { this.version = version; }
 }
