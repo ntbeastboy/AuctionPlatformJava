@@ -1,1 +1,3 @@
 rootProject.name = 'AuctionPlatformJava'
+
+include 'shared', 'server', 'client'

@@ -1,0 +1,29 @@
+plugins {
+    id 'application'
+}
+
+dependencies {
+    implementation project(':shared')
+
+    // Embedded HTTP server
+    implementation 'io.javalin:javalin:6.4.0'
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.17.0'
+    implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.17.0'
+
+    // SQLite persistence
+    implementation 'org.xerial:sqlite-jdbc:3.45.1.0'
+
+    // SLF4J (required by Javalin)
+    implementation 'org.slf4j:slf4j-simple:2.0.12'
+}
+
+application {
+    mainClass = 'com.auction.server.ServerMain'
+}
+
+run {
+    // ServerMain reads ./auction_data.db; pin the working dir to the repo
+    // root so the same DB file is used regardless of where `gradle :server:run`
+    // is invoked from.
+    workingDir = rootProject.projectDir
+}

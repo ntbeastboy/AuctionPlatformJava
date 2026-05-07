@@ -1,0 +1,2 @@
+// Shared module: pure-Java domain code, no framework dependencies.
+// Common configuration is inherited from the root build.gradle.

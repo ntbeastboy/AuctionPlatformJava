@@ -1,0 +1,36 @@
+plugins {
+    id 'application'
+    id 'org.openjfx.javafxplugin' version '0.1.0'
+}
+
+dependencies {
+    implementation project(':shared')
+
+    // JavaFX desktop UI
+    implementation 'org.openjfx:javafx-controls:21'
+    implementation 'org.openjfx:javafx-fxml:21'
+    implementation 'org.openjfx:javafx-graphics:21'
+
+    // HTTP client
+    implementation 'com.squareup.okhttp3:okhttp:4.11.0'
+    implementation 'com.google.code.gson:gson:2.10.1'
+}
+
+javafx {
+    version = '21'
+    modules = ['javafx.controls', 'javafx.fxml', 'javafx.graphics']
+}
+
+application {
+    mainClass = 'com.auction.app.MainApplication'
+}
+
+run {
+    doFirst {
+        systemProperties System.getProperties()
+    }
+    jvmArgs = [
+            '--enable-native-access=javafx.graphics',
+            '--add-opens=java.base/java.lang=ALL-UNNAMED'
+    ]
+}
