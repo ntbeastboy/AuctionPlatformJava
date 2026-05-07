@@ -404,9 +404,12 @@ public class AuctionListController {
     /** Returns an error message string, or null if everything is valid. */
     private String validateCard(TextField amountF, TextField nameF, TextField cardF,
                                 TextField expiryF, TextField cvvF) {
-        // Amount
+        // Amount — plain decimal only; reject scientific notation (e.g. 1e3).
+        String amountStr = amountF.getText().trim();
+        if (!amountStr.matches("\\d+(\\.\\d+)?"))
+            return "Amount must be a plain number (e.g. 100 or 99.99)";
         try {
-            double amount = Double.parseDouble(amountF.getText().trim());
+            double amount = Double.parseDouble(amountStr);
             if (amount <= 0) return "Amount must be positive.";
         } catch (NumberFormatException e) {
             return "Amount is not a valid number.";
