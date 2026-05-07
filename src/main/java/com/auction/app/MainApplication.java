@@ -1,13 +1,19 @@
 package com.auction.app;
 
 import com.auction.controller.LoginController;
-import com.auction.model.Admin;
-import com.auction.repository.*;
-import com.auction.security.PasswordUtil;
+import com.auction.repository.ItemRepository;
+import com.auction.repository.UserRepository;
+import com.auction.repository.rest.RestItemRepository;
+import com.auction.repository.rest.RestUserRepository;
 import com.auction.service.AuctionService;
 import com.auction.service.BidService;
 import com.auction.service.ItemService;
 import com.auction.service.UserService;
+import com.auction.service.http.HttpClientService;
+import com.auction.service.rest.RestAuctionService;
+import com.auction.service.rest.RestBidService;
+import com.auction.service.rest.RestItemService;
+import com.auction.service.rest.RestUserService;
 import javafx.application.Application;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Scene;
@@ -18,7 +24,6 @@ import java.io.IOException;
 public class MainApplication extends Application {
 
     private AppState appState;
-    private DatabaseManager databaseManager;
 
     @Override
     public void start(Stage primaryStage) throws IOException {
@@ -40,27 +45,23 @@ public class MainApplication extends Application {
     @Override
     public void stop() {
         if (appState != null) appState.auctionService.shutdown();
-        if (databaseManager != null) databaseManager.close();
     }
 
     private AppState buildAppState() {
-        databaseManager = new DatabaseManager("auction_data.db");
+        // Single HTTP client shared across all REST-backed services so the
+        // JWT bearer token captured at login flows to every other call.
+        HttpClientService http = new HttpClientService();
 
-        UserRepository userRepo = new SqliteUserRepository(databaseManager);
-        ItemRepository itemRepo = new SqliteItemRepository(databaseManager);
-        BidRepository bidRepo = new SqliteBidRepository(databaseManager);
+        UserRepository userRepo = new RestUserRepository(http);
+        ItemRepository itemRepo = new RestItemRepository(http);
 
-        UserService userService = new UserService(userRepo);
-        ItemService itemService = new ItemService(itemRepo);
-        BidService bidService = new BidService(itemRepo, bidRepo, userRepo);
-        AuctionService auctionService = new AuctionService(itemRepo, userRepo);
+        RestUserService userService = new RestUserService(userRepo, http);
+        ItemService itemService = new RestItemService(itemRepo, http);
+        BidService bidService = new RestBidService(http);
+        AuctionService auctionService = new RestAuctionService(http);
 
-        // Pre-seed admin account if not already in database
-        if (!userRepo.existsByUsername("admin")) {
-            userRepo.save(new Admin("admin-0", "admin", PasswordUtil.hash("admin")));
-        }
-
-        return new AppState(userRepo, itemRepo, userService, itemService, bidService, auctionService);
+        return new AppState(userRepo, itemRepo, userService, itemService,
+                bidService, auctionService, userService);
     }
 
     public static void main(String[] args) {

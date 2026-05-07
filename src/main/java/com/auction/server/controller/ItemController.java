@@ -140,6 +140,19 @@ public class ItemController {
         ctx.json(Map.of("message", "Marked as sold/paid."));
     }
 
+    public void handleDeleteItem(Context ctx) {
+        String role = ctx.attribute("role");
+        if (!"ADMIN".equals(role))
+            throw new UnauthorizedActionException("Only admins can delete items.");
+
+        String id = ctx.pathParam("id");
+        String userId = ctx.attribute("userId");
+        User user = userRepo.findById(userId)
+                .orElseThrow(() -> new UserNotFoundException("User not found: " + userId));
+        itemService.deleteItem(user, id);
+        ctx.json(Map.of("message", "Item deleted."));
+    }
+
     private Map<String, Object> itemToMap(Item item) {
         Map<String, Object> map = new HashMap<>();
         map.put("id", item.getId());
@@ -156,6 +169,26 @@ public class ItemController {
 
         String type = itemType(item);
         map.put("type", type);
+
+        // Subtype-specific fields so the desktop client can render the
+        // detail dialog without an extra round trip.
+        if (item instanceof Art a) {
+            map.put("artist", a.getArtist());
+            map.put("paintingStyle", a.getPaintingStyle());
+            map.put("origin", a.getOrigin());
+        } else if (item instanceof Electronics e) {
+            map.put("wattage", e.getWattage());
+            map.put("origin", e.getOrigin());
+            map.put("warrantyMonths", e.getWarrantyMonths());
+            map.put("serialNumber", e.getSerialNumber());
+        } else if (item instanceof Vehicle v) {
+            map.put("miles", v.getMiles());
+            if (v.getManufacturingDate() != null)
+                map.put("manufacturingDate", v.getManufacturingDate().toString());
+            map.put("brand", v.getBrand());
+            map.put("vin", v.getVin());
+            map.put("accidentHistory", v.hasAccidentHistory());
+        }
 
         // Resolve seller name
         userRepo.findById(item.getSellerId()).ifPresent(u -> map.put("sellerName", u.getUsername()));

@@ -111,6 +111,7 @@ public class AuctionListController {
     @FXML
     private void onLogout() throws IOException {
         appState.auctionService.setStatusChangeCallback(null);
+        appState.restUserService.logout();
         appState.currentUser = null;
         FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/login.fxml"));
         Scene scene = new Scene(loader.load(), 420, 300);
@@ -126,8 +127,11 @@ public class AuctionListController {
     private void onAddFunds() {
         showCardDialog().ifPresent(amount -> {
             try {
-                if (appState.currentUser instanceof Bidder b) b.addFunds(amount);
-                else if (appState.currentUser instanceof Seller s) s.addFunds(amount);
+                // Persist via the server so the new balance survives across
+                // sessions and is visible to every other call (placeBid in
+                // particular re-fetches the user inside the bid lock).
+                User updated = appState.restUserService.addBalance(appState.currentUser.getId(), amount);
+                appState.currentUser = updated;
                 refreshUserInfo();
                 showStatus("Added $" + String.format("%.2f", amount) + " to your balance.", false);
             } catch (Exception e) {
@@ -153,9 +157,14 @@ public class AuctionListController {
         dlg.setHeaderText("Enter amount to withdraw:");
         dlg.showAndWait().ifPresent(val -> {
             try {
-                double amount = Double.parseDouble(val.trim());
-                if (appState.currentUser instanceof Bidder b) b.withdraw(amount);
-                else if (appState.currentUser instanceof Seller s) s.withdraw(amount);
+                String trimmed = val.trim();
+                if (!trimmed.matches("\\d+(\\.\\d+)?")) {
+                    showStatus("Amount must be a plain number (e.g. 100 or 99.99).", true);
+                    return;
+                }
+                double amount = Double.parseDouble(trimmed);
+                User updated = appState.restUserService.deductBalance(appState.currentUser.getId(), amount);
+                appState.currentUser = updated;
                 refreshUserInfo();
                 showStatus("Withdrew $" + String.format("%.2f", amount) + " from your balance.", false);
             } catch (Exception e) {
@@ -181,7 +190,7 @@ public class AuctionListController {
     @FXML private void onEndEarly() { withSelected(item -> { appState.auctionService.endAuctionEarly(item.getId(), appState.currentUser); refreshTable(); showStatus("Auction ended early.", false); }); }
     @FXML private void onCancel()   { withSelected(item -> { appState.auctionService.cancelAuction(item.getId(), appState.currentUser);  refreshTable(); showStatus("Auction cancelled.", false); }); }
     @FXML private void onDelete()   { withSelected(item -> { appState.itemService.deleteItem(appState.currentUser, item.getId());         refreshTable(); showStatus("Item deleted.", false); }); }
-    @FXML private void onMarkPaid() { withSelected(item -> { appState.auctionService.markPaid(item.getId(), appState.currentUser);           refreshTable(); showStatus("Marked as paid.", false); }); }
+    @FXML private void onMarkPaid() { withSelected(item -> { appState.auctionService.markPaid(item.getId(), appState.currentUser);           refreshCurrentUser(); refreshTable(); showStatus("Marked as paid.", false); }); }
 
     @FXML
     private void onConfirmPay() {
@@ -194,6 +203,7 @@ public class AuctionListController {
             }
 
             appState.auctionService.markPaid(item.getId(), appState.currentUser);
+            refreshCurrentUser();
             refreshTable();
             showStatus("Payment confirmed. Auction marked as PAID.", false);
         });
@@ -231,6 +241,18 @@ public class AuctionListController {
         itemTable.setItems(FXCollections.observableArrayList(appState.itemRepository.findAll()));
         itemTable.refresh();
         refreshUserInfo();
+    }
+
+    /**
+     * Re-fetch the current user from the server after a balance-changing
+     * action (e.g. winning bid + markPaid). Falls back silently if the
+     * server can't be reached so we don't blow up the UI.
+     */
+    private void refreshCurrentUser() {
+        try {
+            User fresh = appState.restUserService.refresh(appState.currentUser.getId());
+            if (fresh != null) appState.currentUser = fresh;
+        } catch (Exception ignored) { }
     }
 
     private void refreshUserInfo() {

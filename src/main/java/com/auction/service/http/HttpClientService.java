@@ -82,6 +82,21 @@ public class HttpClientService {
         }
     }
 
+    public String delete(String endpoint) throws IOException {
+        Request.Builder builder = new Request.Builder()
+                .url(BASE_URL + endpoint)
+                .delete();
+        addAuth(builder);
+
+        try (Response response = httpClient.newCall(builder.build()).execute()) {
+            if (!response.isSuccessful()) {
+                String errorBody = response.body() != null ? response.body().string() : "Unknown error";
+                throw new IOException("HTTP " + response.code() + ": " + errorBody);
+            }
+            return response.body() != null ? response.body().string() : "";
+        }
+    }
+
     public Gson getGson() {
         return gson;
     }

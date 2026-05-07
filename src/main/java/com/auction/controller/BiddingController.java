@@ -60,6 +60,12 @@ public class BiddingController {
             appState.bidService.placeBid(appState.currentUser, item.getId(), amount);
             // Refresh item state from repository
             item = appState.itemRepository.findById(item.getId()).orElse(item);
+            // Refresh user state too — the server is authoritative for the
+            // balance, and we want the next bid attempt to see the latest.
+            try {
+                var fresh = appState.restUserService.refresh(appState.currentUser.getId());
+                if (fresh != null) appState.currentUser = fresh;
+            } catch (Exception ignored) { }
             populateDetails();
             showStatus("Bid of $" + String.format("%.2f", amount) + " placed!", false);
         } catch (Exception e) {
