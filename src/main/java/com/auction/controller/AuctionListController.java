@@ -114,7 +114,7 @@ public class AuctionListController {
         appState.restUserService.logout();
         appState.currentUser = null;
         FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/login.fxml"));
-        Scene scene = new Scene(loader.load(), 420, 300);
+        Scene scene = new Scene(loader.load(), 520, 440);
         scene.getStylesheets().add(getClass().getResource("/css/style.css").toExternalForm());
         LoginController controller = loader.getController();
         controller.init(appState, stage);

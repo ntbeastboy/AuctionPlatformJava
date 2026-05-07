@@ -55,7 +55,7 @@ public class LoginController {
     private void onGoToRegister() {
         try {
             FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/register.fxml"));
-            Scene scene = new Scene(loader.load(), 420, 360);
+            Scene scene = new Scene(loader.load(), 520, 440);
             scene.getStylesheets().add(getClass().getResource("/css/style.css").toExternalForm());
             RegisterController controller = loader.getController();
             controller.init(appState, stage);
