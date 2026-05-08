@@ -17,7 +17,7 @@ import java.time.format.DateTimeFormatter;
 
 public class BiddingController {
 
-    private static final DateTimeFormatter DT_FMT = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
+    private static final DateTimeFormatter DT_FMT = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss");
 
 
     @FXML private Label lblName;

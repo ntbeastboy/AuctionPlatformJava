@@ -23,7 +23,7 @@ import java.util.UUID;
 
 public class AuctionListController {
 
-    private static final DateTimeFormatter DT_FMT = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
+    private static final DateTimeFormatter DT_FMT = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss");
 
     @FXML private Label userInfoLabel;
     @FXML private Button addFundsBtn;
@@ -32,8 +32,8 @@ public class AuctionListController {
     @FXML private TableColumn<Item, String>        colName;
     @FXML private TableColumn<Item, String>        colType;
     @FXML private TableColumn<Item, AuctionStatus> colStatus;
-    @FXML private TableColumn<Item, Double>        colPrice;
-    @FXML private TableColumn<Item, Double>        colMinBid;
+    @FXML private TableColumn<Item, String>        colPrice;
+    @FXML private TableColumn<Item, String>        colMinBid;
     @FXML private TableColumn<Item, String>        colEndTime;
     @FXML private TableColumn<Item, String>        colWinner;
     @FXML private Button createItemBtn;
@@ -57,7 +57,15 @@ public class AuctionListController {
 
         appState.auctionService.setStatusChangeCallback(() -> Platform.runLater(this::refreshTable));
     }
-
+    private String formatPrice(double amount) {
+    if (amount >= 1_000_000_000)
+        return String.format("$%.3gB", amount / 1_000_000_000);
+    if (amount >= 1_000_000)
+        return String.format("$%.3gM", amount / 1_000_000);
+    if (amount >= 1_000)
+        return String.format("$%.3gK", amount / 1_000);
+    return String.format("$%.2f", amount);
+    }
     private void setupTable() {
         colName.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getName()));
         itemTable.setRowFactory(tv -> {
@@ -70,10 +78,12 @@ public class AuctionListController {
         });
         colType.setCellValueFactory(c -> new SimpleStringProperty(typeName(c.getValue())));
         colStatus.setCellValueFactory(new PropertyValueFactory<>("status"));
-        colPrice.setCellValueFactory(new PropertyValueFactory<>("currentPrice"));
+        colPrice.setCellValueFactory(c ->
+            new SimpleStringProperty(formatPrice(c.getValue().getCurrentPrice())));
+
         colMinBid.setCellValueFactory(c -> {
             Item i = c.getValue();
-            return new SimpleObjectProperty<>(i.getCurrentPrice() + i.getPriceStep());
+            return new SimpleStringProperty(formatPrice(i.getCurrentPrice() + i.getPriceStep()));
         });
         colEndTime.setCellValueFactory(c -> {
             Item item = c.getValue();
@@ -262,9 +272,9 @@ public class AuctionListController {
         r = addRow(grid, r, "Description",   item.getDescription());
         r = addRow(grid, r, "Type",          typeName(item));
         r = addRow(grid, r, "Status",        item.getStatus().toString());
-        r = addRow(grid, r, "Starting price","$" + String.format("%.2f", item.getStartingPrice()));
-        r = addRow(grid, r, "Current price", "$" + String.format("%.2f", item.getCurrentPrice()));
-        r = addRow(grid, r, "Price step",    "$" + String.format("%.2f", item.getPriceStep()));
+        r = addRow(grid, r, "Starting price","$" + String.format("%,.2f", item.getStartingPrice()));
+        r = addRow(grid, r, "Current price", "$" + String.format("%,.2f", item.getCurrentPrice()));
+        r = addRow(grid, r, "Price step",    "$" + String.format("%,.2f", item.getPriceStep()));
         r = addRow(grid, r, "Start time",    item.getStatus() != AuctionStatus.OPEN && item.getBidStartTime() != null ? item.getBidStartTime().format(DT_FMT) : "—");
         r = addRow(grid, r, "End time",      item.getStatus() != AuctionStatus.OPEN && item.getBidEndTime()   != null ? item.getBidEndTime().format(DT_FMT)   : "—");
         r = addRow(grid, r, "Winner",        winner);
