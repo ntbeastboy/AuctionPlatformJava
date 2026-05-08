@@ -1,8 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(wc -l /c/Users/Vantablack/AuctionPlatformJava/src/main/java/com/auction/controller/*.java /c/Users/Vantablack/AuctionPlatformJava/src/main/java/com/auction/app/*.java)",
-      "Bash(find /c/Users/Vantablack/AuctionPlatformJava/src/main/resources -type f -exec wc -l {} \\\\;)"
-    ]
-  }
-}
