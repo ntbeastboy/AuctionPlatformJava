@@ -28,3 +28,4 @@ Thumbs.db
 # SQLite Database
 *.db
 *.db-shm
+*.db-wal
