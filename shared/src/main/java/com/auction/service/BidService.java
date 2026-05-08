@@ -65,6 +65,9 @@ public class BidService {
                 if (LocalDateTime.now().isAfter(item.getBidEndTime()))
                     throw new AuctionClosedException("This auction has ended.");
 
+                if (user.getId().equals(item.getCurrentWinnerId()))
+                    throw new InvalidBidException("You are already the highest bidder.");
+
                 if (amount <= 0)
                     throw new InvalidBidException("Bid amount must be positive.");
 
