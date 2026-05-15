@@ -1,6 +1,7 @@
 package com.auction.model;
 
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 
 public abstract class Item implements Entity {
     final String id;
@@ -71,4 +72,7 @@ public abstract class Item implements Entity {
     public long getVersion() { return version; }
 
     public void setVersion(long version) { this.version = version; }
+
+
+
 }

@@ -215,7 +215,7 @@ public class AuctionListController {
     private void switchToBidding(Item item) {
         try {
             FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/bidding.fxml"));
-            Scene scene = new Scene(loader.load(), 520, 440);
+            Scene scene = new Scene(loader.load(), 900, 800);
             scene.getStylesheets().add(getClass().getResource("/css/style.css").toExternalForm());
             BiddingController controller = loader.getController();
             controller.init(appState, stage, item);
