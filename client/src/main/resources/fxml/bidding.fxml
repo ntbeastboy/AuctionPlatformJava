@@ -36,14 +36,16 @@
         </GridPane>
         <children>
 
-            <LineChart fx:id="priceChart" layoutX="10" layoutY="10" prefWidth="800" prefHeight="500">
+            <LineChart fx:id="priceChart"
+                       prefWidth="600"
+                       prefHeight="400">
 
                 <xAxis>
-                    <CategoryAxis fx:id="timeAxis" label="Time"/>
+                    <CategoryAxis label="Time"/>
                 </xAxis>
 
                 <yAxis>
-                    <NumberAxis fx:id="priceAxis" label="Price"/>
+                    <NumberAxis label="Price"/>
                 </yAxis>
 
             </LineChart>

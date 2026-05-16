@@ -5,6 +5,7 @@ plugins {
 
 dependencies {
     implementation project(':shared')
+    implementation project(':server')
 
     // JavaFX desktop UI
     implementation 'org.openjfx:javafx-controls:21'

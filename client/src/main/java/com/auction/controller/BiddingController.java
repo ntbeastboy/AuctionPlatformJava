@@ -1,24 +1,28 @@
 package com.auction.controller;
 
 import com.auction.app.AppState;
-import com.auction.model.Art;
-import com.auction.model.Electronics;
-import com.auction.model.Item;
-import com.auction.model.Vehicle;
+import com.auction.model.*;
+import com.auction.repository.DatabaseManager;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Scene;
+import javafx.scene.chart.LineChart;
+import javafx.scene.chart.XYChart;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
 import javafx.stage.Stage;
+import com.auction.repository.SqliteBidRepository;
 
 import java.io.IOException;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 
 public class BiddingController {
 
     private static final DateTimeFormatter DT_FMT = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss");
-
 
     @FXML private Label lblName;
     @FXML private Label lblDesc;
@@ -29,6 +33,47 @@ public class BiddingController {
     @FXML private Label lblEndTime;
     @FXML private TextField bidAmountField;
     @FXML private Label statusLabel;
+    @FXML private LineChart<String, Number> priceChart;
+
+    private SqliteBidRepository bidRepo = new SqliteBidRepository(new DatabaseManager("../auction_data.db"));
+
+    public void setItem(String itemId) {
+
+        List<Bid> bids = bidRepo.findByItemId(itemId);
+        System.out.println("BIDS SIZE = " + bids.size());
+        loadChart(bids);
+    }
+
+    private void loadChart(List<Bid> bids) {
+
+        XYChart.Series<String, Number> series =
+                new XYChart.Series<>();
+
+        series.setName("Bid History");
+
+        for (Bid bid : bids) {
+
+            long seconds = bid.getTimestamp();
+            long milliSeconds = seconds * 1000L;
+            LocalDateTime dateTime = LocalDateTime.ofInstant(
+                    Instant.ofEpochMilli(milliSeconds),
+                    ZoneId.systemDefault()
+            );
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss");
+            String date = dateTime.format(formatter);
+            String label = date;
+
+            series.getData().add(
+                    new XYChart.Data<>(
+                            label,
+                            bid.getAmount()
+                    )
+            );
+        }
+
+        priceChart.getData().clear();
+        priceChart.getData().add(series);
+    }
 
     private AppState appState;
     private Stage stage;
@@ -38,6 +83,7 @@ public class BiddingController {
         this.appState = appState;
         this.stage = stage;
         this.item = item;
+        setItem(item.getId());
         populateDetails();
     }
 
