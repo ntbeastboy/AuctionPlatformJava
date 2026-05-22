@@ -19,6 +19,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Objects;
 
 public class BiddingController {
 
@@ -35,12 +36,24 @@ public class BiddingController {
     @FXML private Label statusLabel;
     @FXML private LineChart<String, Number> priceChart;
 
-    private SqliteBidRepository bidRepo = new SqliteBidRepository(new DatabaseManager("../auction_data.db"));
+    private final SqliteBidRepository bidRepo = new SqliteBidRepository(new DatabaseManager("../auction_data.db"));
+    private AppState appState;
+    private Stage stage;
+    private Item item;
+
+    public void init(AppState appState, Stage stage, Item item) {
+        this.appState = appState;
+        this.stage = stage;
+        this.item = item;
+        setItem(item.getId());
+        populateDetails();
+    }
 
     public void setItem(String itemId) {
-
+        long millis = item.getBidStartTime().atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
+        Bid bid = new Bid(item.getSellerId(),item.getId(),item.getStartingPrice(),millis/1000L);
         List<Bid> bids = bidRepo.findByItemId(itemId);
-        System.out.println("BIDS SIZE = " + bids.size());
+        bids.addFirst(bid);
         loadChart(bids);
     }
 
@@ -60,8 +73,7 @@ public class BiddingController {
                     ZoneId.systemDefault()
             );
             DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss");
-            String date = dateTime.format(formatter);
-            String label = date;
+            String label = dateTime.format(formatter);
 
             series.getData().add(
                     new XYChart.Data<>(
@@ -73,18 +85,6 @@ public class BiddingController {
 
         priceChart.getData().clear();
         priceChart.getData().add(series);
-    }
-
-    private AppState appState;
-    private Stage stage;
-    private Item item;
-
-    public void init(AppState appState, Stage stage, Item item) {
-        this.appState = appState;
-        this.stage = stage;
-        this.item = item;
-        setItem(item.getId());
-        populateDetails();
     }
 
     private void populateDetails() {
@@ -117,6 +117,7 @@ public class BiddingController {
         } catch (Exception e) {
             showStatus(e.getMessage(), true);
         }
+        setItem(item.getId());
     }
 
     @FXML
@@ -124,7 +125,7 @@ public class BiddingController {
         try {
             FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/auction-list.fxml"));
             Scene scene = new Scene(loader.load(), 900, 580);
-            scene.getStylesheets().add(getClass().getResource("/css/style.css").toExternalForm());
+            scene.getStylesheets().add(Objects.requireNonNull(getClass().getResource("/css/style.css")).toExternalForm());
             AuctionListController controller = loader.getController();
             controller.init(appState, stage);
             stage.setScene(scene);
