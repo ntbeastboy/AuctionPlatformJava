@@ -104,7 +104,20 @@ public final class JsonMappers {
         String bidderId = str(map, "bidderId");
         String itemId = str(map, "itemId");
         double amount = num(map, "bidAmount");
-        return new Bid(bidderId, itemId, amount);
+        long timestamp = Math.round(num(map, "timestamp"));
+        if (timestamp <= 0) return new Bid(bidderId, itemId, amount);
+        return new Bid(bidderId, itemId, amount, timestamp);
+    }
+
+    public static AutoBid toAutoBid(Map<String, Object> map) {
+        if (map == null) return null;
+        return new AutoBid(
+                str(map, "userId"),
+                str(map, "itemId"),
+                num(map, "maxBid"),
+                num(map, "increment"),
+                Math.round(num(map, "createdAt"))
+        );
     }
 
     @SuppressWarnings("unchecked")

@@ -116,8 +116,21 @@ public class DatabaseManager {
                 )
             """);
 
+            stmt.executeUpdate("""
+                CREATE TABLE IF NOT EXISTS auto_bids (
+                    user_id TEXT NOT NULL,
+                    item_id TEXT NOT NULL,
+                    max_bid REAL NOT NULL,
+                    increment REAL NOT NULL,
+                    created_at INTEGER NOT NULL,
+                    PRIMARY KEY (user_id, item_id)
+                )
+            """);
+
             stmt.executeUpdate("CREATE INDEX IF NOT EXISTS idx_bids_item_id ON bids(item_id)");
             stmt.executeUpdate("CREATE INDEX IF NOT EXISTS idx_bids_bidder_id ON bids(bidder_id)");
+            stmt.executeUpdate("CREATE INDEX IF NOT EXISTS idx_auto_bids_item_id ON auto_bids(item_id)");
+            stmt.executeUpdate("CREATE INDEX IF NOT EXISTS idx_auto_bids_user_id ON auto_bids(user_id)");
         }
     }
 

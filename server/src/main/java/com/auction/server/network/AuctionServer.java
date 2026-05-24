@@ -6,6 +6,7 @@ import com.auction.server.controller.AuctionController;
 import com.auction.server.controller.BidController;
 import com.auction.server.controller.ItemController;
 import com.auction.server.controller.UserController;
+import com.auction.server.events.ItemEventBroadcaster;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
@@ -16,7 +17,8 @@ public class AuctionServer {
     private final Javalin app;
 
     public AuctionServer(UserController userController, ItemController itemController,
-                         BidController bidController, AuctionController auctionController) {
+                         BidController bidController, AuctionController auctionController,
+                         ItemEventBroadcaster eventBroadcaster) {
         this.app = Javalin.create(config -> {
             config.jsonMapper(new io.javalin.json.JavalinJackson(createObjectMapper(), false));
             config.showJavalinBanner = false;
@@ -24,6 +26,7 @@ public class AuctionServer {
 
         app.before(new AuthMiddleware());
         ExceptionMapper.register(app);
+        eventBroadcaster.register(app);
         registerRoutes(userController, itemController, bidController, auctionController);
     }
 
@@ -65,6 +68,10 @@ public class AuctionServer {
         app.get("/api/bids/item/{itemId}", bid::handleGetBidsForItem);
         app.get("/api/bids/bidder/{bidderId}", bid::handleGetBidsByBidder);
         app.get("/api/bids/{id}", bid::handleGetBidById);
+
+        app.post("/api/auto-bids", bid::handleSetAutoBid);
+        app.get("/api/auto-bids/item/{itemId}/me", bid::handleGetMyAutoBid);
+        app.delete("/api/auto-bids/item/{itemId}/me", bid::handleCancelAutoBid);
 
         // ── Auction Control ──
         app.post("/api/auction/{id}/start", auction::handleStartAuction);

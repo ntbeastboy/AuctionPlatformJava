@@ -19,6 +19,7 @@
 
     <Label text="Don't have an account?" styleClass="muted-label"/>
     <Button text="Register" onAction="#onGoToRegister" styleClass="btn-secondary" prefWidth="260"/>
+    <Button text="Server" onAction="#onConfigureServer" styleClass="btn-secondary" prefWidth="260"/>
 
     <Label alignment="CENTER" fx:id="errorLabel" styleClass="error-label" wrapText="true" maxWidth="300"/>
 </VBox>

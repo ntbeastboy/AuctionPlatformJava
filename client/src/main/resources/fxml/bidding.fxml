@@ -58,6 +58,17 @@
 
     <Separator/>
 
+    <GridPane hgap="12" vgap="8">
+        <Label text="Auto-bid max:" GridPane.rowIndex="0" GridPane.columnIndex="0"/>
+        <TextField fx:id="autoMaxBidField" promptText="Max bid" prefWidth="140" GridPane.rowIndex="0" GridPane.columnIndex="1"/>
+        <Label text="Increment:" GridPane.rowIndex="0" GridPane.columnIndex="2"/>
+        <TextField fx:id="autoIncrementField" promptText="Increment" prefWidth="140" GridPane.rowIndex="0" GridPane.columnIndex="3"/>
+        <Button text="Enable Auto-Bid" onAction="#onEnableAutoBid" styleClass="btn-primary" GridPane.rowIndex="0" GridPane.columnIndex="4"/>
+        <Button text="Cancel Auto-Bid" onAction="#onCancelAutoBid" styleClass="btn-secondary" GridPane.rowIndex="0" GridPane.columnIndex="5"/>
+        <Label fx:id="autoBidInfoLabel" styleClass="muted-label" wrapText="true" maxWidth="520" GridPane.rowIndex="1" GridPane.columnIndex="0" GridPane.columnSpan="6"/>
+    </GridPane>
+
+    <Separator/>
 
     <Region VBox.vgrow="ALWAYS"/>
     <HBox>

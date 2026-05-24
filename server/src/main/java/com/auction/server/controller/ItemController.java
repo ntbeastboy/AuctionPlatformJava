@@ -6,6 +6,7 @@ import com.auction.exception.UserNotFoundException;
 import com.auction.model.*;
 import com.auction.repository.ItemRepository;
 import com.auction.repository.UserRepository;
+import com.auction.server.events.ItemEventBroadcaster;
 import com.auction.service.AuctionService;
 import com.auction.service.ItemService;
 import io.javalin.http.Context;
@@ -20,13 +21,21 @@ public class ItemController {
     private final UserRepository userRepo;
     private final ItemService itemService;
     private final AuctionService auctionService;
+    private final ItemEventBroadcaster eventBroadcaster;
 
     public ItemController(ItemRepository itemRepo, UserRepository userRepo,
                           ItemService itemService, AuctionService auctionService) {
+        this(itemRepo, userRepo, itemService, auctionService, null);
+    }
+
+    public ItemController(ItemRepository itemRepo, UserRepository userRepo,
+                          ItemService itemService, AuctionService auctionService,
+                          ItemEventBroadcaster eventBroadcaster) {
         this.itemRepo = itemRepo;
         this.userRepo = userRepo;
         this.itemService = itemService;
         this.auctionService = auctionService;
+        this.eventBroadcaster = eventBroadcaster;
     }
 
     public void handleGetAllItems(Context ctx) {
@@ -106,6 +115,7 @@ public class ItemController {
         };
 
         itemService.createItem(seller, item);
+        broadcastItemsChanged();
         ctx.status(201).json(itemToMap(item));
     }
 
@@ -122,12 +132,14 @@ public class ItemController {
 
         item.setCurrentPrice(newPrice);
         itemRepo.update(item);
+        broadcastItemUpdated(id);
         ctx.json(itemToMap(item));
     }
 
     public void handleCloseItem(Context ctx) {
         String id = ctx.pathParam("id");
         auctionService.closeAuction(id);
+        broadcastItemUpdated(id);
         ctx.json(Map.of("message", "Auction closed."));
     }
 
@@ -141,6 +153,7 @@ public class ItemController {
         User user = userRepo.findById(userId)
                 .orElseThrow(() -> new UserNotFoundException("User not found: " + userId));
         itemService.deleteItem(user, id);
+        broadcastItemsChanged();
         ctx.json(Map.of("message", "Item deleted."));
     }
 
@@ -192,5 +205,13 @@ public class ItemController {
         if (item instanceof Electronics) return "Electronics";
         if (item instanceof Vehicle) return "Vehicle";
         return "Other";
+    }
+
+    private void broadcastItemUpdated(String itemId) {
+        if (eventBroadcaster != null) eventBroadcaster.broadcastItemUpdated(itemId);
+    }
+
+    private void broadcastItemsChanged() {
+        if (eventBroadcaster != null) eventBroadcaster.broadcastItemsChanged();
     }
 }

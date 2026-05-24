@@ -3,6 +3,8 @@ package com.auction.server.controller;
 import com.auction.exception.UnauthorizedActionException;
 import com.auction.exception.UserNotFoundException;
 import com.auction.model.*;
+import com.auction.repository.AutoBidRepository;
+import com.auction.repository.ItemRepository;
 import com.auction.repository.UserRepository;
 import com.auction.security.JwtUtil;
 import com.auction.service.UserService;
@@ -14,10 +16,19 @@ import java.util.Map;
 public class UserController {
 
     private final UserRepository userRepo;
+    private final ItemRepository itemRepo;
+    private final AutoBidRepository autoBidRepo;
     private final UserService userService;
 
     public UserController(UserRepository userRepo, UserService userService) {
+        this(userRepo, null, null, userService);
+    }
+
+    public UserController(UserRepository userRepo, ItemRepository itemRepo,
+                          AutoBidRepository autoBidRepo, UserService userService) {
         this.userRepo = userRepo;
+        this.itemRepo = itemRepo;
+        this.autoBidRepo = autoBidRepo;
         this.userService = userService;
     }
 
@@ -59,6 +70,7 @@ public class UserController {
 
     public void handleAddBalance(Context ctx) {
         String id = ctx.pathParam("id");
+        requireSelfOrAdmin(ctx, id, "add balance to this account");
         double amount = Double.parseDouble(ctx.queryParam("amount"));
         User user = userRepo.findById(id)
                 .orElseThrow(() -> new UserNotFoundException("User not found: " + id));
@@ -71,9 +83,15 @@ public class UserController {
 
     public void handleDeductBalance(Context ctx) {
         String id = ctx.pathParam("id");
+        requireSelfOrAdmin(ctx, id, "deduct balance from this account");
         double amount = Double.parseDouble(ctx.queryParam("amount"));
         User user = userRepo.findById(id)
                 .orElseThrow(() -> new UserNotFoundException("User not found: " + id));
+        double remainingBalance = balanceOf(user) - amount;
+        double committed = committedAmount(id);
+        if (remainingBalance < committed)
+            throw new IllegalStateException("Cannot withdraw below active bid and auto-bid commitments ($"
+                    + String.format("%.2f", committed) + " committed).");
         if (user instanceof Bidder b) b.withdraw(amount);
         else if (user instanceof Seller s) s.withdraw(amount);
         else throw new IllegalStateException("Cannot deduct balance from this user type.");
@@ -112,6 +130,38 @@ public class UserController {
         Map<String, Object> map = userToMap(user);
         map.put("token", token);
         return map;
+    }
+
+    private void requireSelfOrAdmin(Context ctx, String targetUserId, String action) {
+        String requesterId = ctx.attribute("userId");
+        String role = ctx.attribute("role");
+        if (!targetUserId.equals(requesterId) && !"ADMIN".equals(role)) {
+            throw new UnauthorizedActionException("Only admins can " + action + ".");
+        }
+    }
+
+    private double committedAmount(String userId) {
+        if (itemRepo == null) return 0.0;
+        Map<String, Double> commitmentsByItem = new HashMap<>();
+        for (Item item : itemRepo.findAll()) {
+            if (item.getStatus() == AuctionStatus.RUNNING && userId.equals(item.getCurrentWinnerId())) {
+                commitmentsByItem.merge(item.getId(), item.getCurrentPrice(), Math::max);
+            }
+        }
+        if (autoBidRepo != null) {
+            for (AutoBid autoBid : autoBidRepo.findByUserId(userId)) {
+                itemRepo.findById(autoBid.getItemId())
+                        .filter(i -> i.getStatus() == AuctionStatus.RUNNING)
+                        .ifPresent(i -> commitmentsByItem.merge(i.getId(), autoBid.getMaxBid(), Math::max));
+            }
+        }
+        return commitmentsByItem.values().stream().mapToDouble(Double::doubleValue).sum();
+    }
+
+    private double balanceOf(User user) {
+        if (user instanceof Bidder b) return b.getBalance();
+        if (user instanceof Seller s) return s.getBalance();
+        return 0.0;
     }
 
     private String roleOf(User user) {
