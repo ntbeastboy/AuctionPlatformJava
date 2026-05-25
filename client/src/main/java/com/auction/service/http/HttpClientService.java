@@ -6,40 +6,67 @@ import com.google.gson.JsonParser;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
+import okhttp3.WebSocket;
+import okhttp3.WebSocketListener;
 
 import java.io.IOException;
 import java.net.ConnectException;
+import java.net.URI;
 import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
+import java.util.Set;
+import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 
 public class HttpClientService {
 
-    private static final String BASE_URL = "http://localhost:8080/api";
+    public static final String DEFAULT_BASE_URL = "http://localhost:8080/api";
     private final OkHttpClient httpClient;
     private final Gson gson;
+    private final Set<Consumer<String>> updateListeners = new CopyOnWriteArraySet<>();
+    private String baseUrl = DEFAULT_BASE_URL;
     private String authToken;
+    private WebSocket eventSocket;
+    private boolean eventSocketConnecting;
 
     public HttpClientService() {
         this.httpClient = new OkHttpClient.Builder()
                 .connectTimeout(10, TimeUnit.SECONDS)
                 .readTimeout(30, TimeUnit.SECONDS)
                 .writeTimeout(30, TimeUnit.SECONDS)
+                .pingInterval(30, TimeUnit.SECONDS)
                 .build();
         this.gson = new Gson();
     }
 
     public void setAuthToken(String token) {
         this.authToken = token;
+        if (token == null || token.isBlank()) {
+            disconnectEvents();
+        } else if (!updateListeners.isEmpty()) {
+            connectEvents();
+        }
     }
 
     public String getAuthToken() {
         return authToken;
     }
 
+    public String getBaseUrl() {
+        return baseUrl;
+    }
+
+    public void setBaseUrl(String baseUrl) {
+        String normalized = normalizeBaseUrl(baseUrl);
+        if (normalized.equals(this.baseUrl)) return;
+        this.baseUrl = normalized;
+        setAuthToken(null);
+    }
+
     public String get(String endpoint) throws IOException {
         Request.Builder builder = new Request.Builder()
-                .url(BASE_URL + endpoint);
+                .url(url(endpoint));
         addAuth(builder);
         return execute(builder.build());
     }
@@ -49,7 +76,7 @@ public class HttpClientService {
         okhttp3.RequestBody body = okhttp3.RequestBody.create(jsonBody, mediaType);
 
         Request.Builder builder = new Request.Builder()
-                .url(BASE_URL + endpoint)
+                .url(url(endpoint))
                 .post(body);
         addAuth(builder);
         return execute(builder.build());
@@ -60,7 +87,7 @@ public class HttpClientService {
         okhttp3.RequestBody body = okhttp3.RequestBody.create(jsonBody, mediaType);
 
         Request.Builder builder = new Request.Builder()
-                .url(BASE_URL + endpoint)
+                .url(url(endpoint))
                 .put(body);
         addAuth(builder);
         return execute(builder.build());
@@ -68,7 +95,7 @@ public class HttpClientService {
 
     public String delete(String endpoint) throws IOException {
         Request.Builder builder = new Request.Builder()
-                .url(BASE_URL + endpoint)
+                .url(url(endpoint))
                 .delete();
         addAuth(builder);
         return execute(builder.build());
@@ -130,9 +157,103 @@ public class HttpClientService {
         return gson;
     }
 
+    public void addUpdateListener(Consumer<String> listener) {
+        updateListeners.add(listener);
+        connectEvents();
+    }
+
+    public void removeUpdateListener(Consumer<String> listener) {
+        updateListeners.remove(listener);
+        if (updateListeners.isEmpty()) disconnectEvents();
+    }
+
+    public synchronized void connectEvents() {
+        if (authToken == null || authToken.isBlank()) return;
+        if (eventSocket != null || eventSocketConnecting) return;
+
+        Request.Builder builder = new Request.Builder().url(eventsUrl());
+        addAuth(builder);
+        eventSocketConnecting = true;
+        eventSocket = httpClient.newWebSocket(builder.build(), new WebSocketListener() {
+            @Override
+            public void onOpen(WebSocket webSocket, Response response) {
+                eventSocketConnecting = false;
+            }
+
+            @Override
+            public void onMessage(WebSocket webSocket, String text) {
+                for (Consumer<String> listener : updateListeners) {
+                    listener.accept(text);
+                }
+            }
+
+            @Override
+            public void onClosed(WebSocket webSocket, int code, String reason) {
+                clearEventSocket(webSocket);
+            }
+
+            @Override
+            public void onFailure(WebSocket webSocket, Throwable t, Response response) {
+                clearEventSocket(webSocket);
+            }
+        });
+    }
+
+    public synchronized void disconnectEvents() {
+        if (eventSocket != null) {
+            eventSocket.close(1000, "client disconnect");
+            eventSocket = null;
+        }
+        eventSocketConnecting = false;
+    }
+
     private void addAuth(Request.Builder builder) {
         if (authToken != null && !authToken.isBlank()) {
             builder.addHeader("Authorization", "Bearer " + authToken);
+        }
+    }
+
+    private String url(String endpoint) {
+        return baseUrl + endpoint;
+    }
+
+    private String eventsUrl() {
+        String wsBase = baseUrl.startsWith("https://")
+                ? "wss://" + baseUrl.substring("https://".length())
+                : "ws://" + baseUrl.substring("http://".length());
+        return wsBase + "/events";
+    }
+
+    private String normalizeBaseUrl(String raw) {
+        if (raw == null || raw.isBlank()) {
+            throw new IllegalArgumentException("Server URL cannot be empty.");
+        }
+        String normalized = raw.trim();
+        if (!normalized.startsWith("http://") && !normalized.startsWith("https://")) {
+            normalized = "http://" + normalized;
+        }
+        while (normalized.endsWith("/")) {
+            normalized = normalized.substring(0, normalized.length() - 1);
+        }
+
+        URI uri;
+        try {
+            uri = URI.create(normalized);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("Server URL is not valid.");
+        }
+        if (uri.getHost() == null || uri.getScheme() == null)
+            throw new IllegalArgumentException("Server URL must include a host.");
+        if (!"http".equals(uri.getScheme()) && !"https".equals(uri.getScheme()))
+            throw new IllegalArgumentException("Server URL must start with http:// or https://.");
+
+        return normalized;
+    }
+
+    private synchronized void clearEventSocket(WebSocket webSocket) {
+        if (eventSocket == webSocket) {
+            eventSocket = null;
+            eventSocketConnecting = false;
         }
     }
 }

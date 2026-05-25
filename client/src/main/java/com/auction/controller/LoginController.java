@@ -5,9 +5,13 @@ import com.auction.model.User;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Scene;
+import javafx.scene.control.ButtonBar;
+import javafx.scene.control.ButtonType;
+import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
 import javafx.scene.control.PasswordField;
 import javafx.scene.control.TextField;
+import javafx.scene.layout.GridPane;
 import javafx.stage.Stage;
 
 import java.io.IOException;
@@ -46,8 +50,7 @@ public class LoginController {
             stage.setScene(scene);
             stage.setResizable(true);
         } catch (Exception e) {
-            errorLabel.setStyle("error-label");
-            errorLabel.setText(e.getMessage());
+            showMessage(e.getMessage(), true);
         }
     }
 
@@ -63,5 +66,35 @@ public class LoginController {
         } catch (IOException e) {
             errorLabel.setText("Failed to load register page.");
         }
+    }
+
+    @FXML
+    private void onConfigureServer() {
+        Dialog<String> dialog = new Dialog<>();
+        dialog.setTitle("Server");
+        dialog.setHeaderText("Connection settings");
+
+        ButtonType saveButton = new ButtonType("Save", ButtonBar.ButtonData.OK_DONE);
+        dialog.getDialogPane().getButtonTypes().addAll(saveButton, ButtonType.CANCEL);
+
+        TextField serverUrlField = new TextField(appState.httpClient.getBaseUrl());
+        serverUrlField.setPrefWidth(320);
+
+        GridPane grid = new GridPane();
+        grid.setHgap(10);
+        grid.setVgap(8);
+        grid.add(new Label("Base URL:"), 0, 0);
+        grid.add(serverUrlField, 1, 0);
+        dialog.getDialogPane().setContent(grid);
+
+        dialog.setResultConverter(button -> button == saveButton ? serverUrlField.getText() : null);
+        dialog.showAndWait().ifPresent(url -> {
+            try {
+                appState.httpClient.setBaseUrl(url);
+                showMessage("Server set to " + appState.httpClient.getBaseUrl(), false);
+            } catch (IllegalArgumentException e) {
+                showMessage(e.getMessage(), true);
+            }
+        });
     }
 }

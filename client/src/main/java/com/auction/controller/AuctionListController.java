@@ -25,6 +25,7 @@ import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.util.UUID;
+import java.util.function.Consumer;
 
 public class AuctionListController {
 
@@ -51,6 +52,7 @@ public class AuctionListController {
 
     private AppState appState;
     private Stage stage;
+    private Consumer<String> updateListener;
 
     public void init(AppState appState, Stage stage) {
         this.appState = appState;
@@ -61,6 +63,7 @@ public class AuctionListController {
         stage.setTitle("Auction Platform – " + appState.currentUser.getUsername());
 
         appState.auctionService.setStatusChangeCallback(() -> Platform.runLater(this::refreshTable));
+        registerRealtimeUpdates();
     }
     private String formatPrice(double amount) {
     if (amount >= 1_000_000_000)
@@ -123,6 +126,7 @@ public class AuctionListController {
 
     @FXML
     private void onLogout() throws IOException {
+        removeRealtimeUpdates();
         appState.auctionService.setStatusChangeCallback(null);
         appState.restUserService.logout();
         appState.currentUser = null;
@@ -219,6 +223,7 @@ public class AuctionListController {
             scene.getStylesheets().add(getClass().getResource("/css/style.css").toExternalForm());
             BiddingController controller = loader.getController();
             controller.init(appState, stage, item);
+            removeRealtimeUpdates();
             stage.setScene(scene);
         } catch (IOException e) {
             showStatus("Failed to open bidding screen: " + e.getMessage(), true);
@@ -236,6 +241,22 @@ public class AuctionListController {
         itemTable.setItems(FXCollections.observableArrayList(appState.itemRepository.findAll()));
         itemTable.refresh();
         refreshUserInfo();
+    }
+
+    private void registerRealtimeUpdates() {
+        removeRealtimeUpdates();
+        updateListener = message -> Platform.runLater(() -> {
+            refreshCurrentUser();
+            refreshTable();
+        });
+        appState.httpClient.addUpdateListener(updateListener);
+    }
+
+    private void removeRealtimeUpdates() {
+        if (updateListener != null && appState != null) {
+            appState.httpClient.removeUpdateListener(updateListener);
+            updateListener = null;
+        }
     }
 
     /**

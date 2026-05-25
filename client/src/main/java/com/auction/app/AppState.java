@@ -7,9 +7,11 @@ import com.auction.service.AuctionService;
 import com.auction.service.BidService;
 import com.auction.service.ItemService;
 import com.auction.service.UserService;
+import com.auction.service.http.HttpClientService;
 import com.auction.service.rest.RestUserService;
 
 public class AppState {
+    public final HttpClientService httpClient;
     public final UserRepository userRepository;
     public final ItemRepository itemRepository;
     public final UserService userService;
@@ -25,10 +27,12 @@ public class AppState {
 
     public User currentUser;
 
-    public AppState(UserRepository userRepository, ItemRepository itemRepository,
+    public AppState(HttpClientService httpClient,
+                    UserRepository userRepository, ItemRepository itemRepository,
                     UserService userService, ItemService itemService,
                     BidService bidService, AuctionService auctionService,
                     RestUserService restUserService) {
+        this.httpClient = httpClient;
         this.userRepository = userRepository;
         this.itemRepository = itemRepository;
         this.userService = userService;

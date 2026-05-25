@@ -7,6 +7,7 @@ import com.auction.server.controller.AuctionController;
 import com.auction.server.controller.BidController;
 import com.auction.server.controller.ItemController;
 import com.auction.server.controller.UserController;
+import com.auction.server.events.ItemEventBroadcaster;
 import com.auction.service.AuctionService;
 import com.auction.service.BidService;
 import com.auction.service.ItemService;
@@ -28,13 +29,16 @@ public class ServerMain {
         UserRepository userRepo = new SqliteUserRepository(db);
         ItemRepository itemRepo = new SqliteItemRepository(db);
         BidRepository bidRepo = new SqliteBidRepository(db);
+        AutoBidRepository autoBidRepo = new SqliteAutoBidRepository(db);
 
         // Services
         UserService userService = new UserService(userRepo);
         ItemService itemService = new ItemService(itemRepo);
         TransactionRunner tx = action -> db.inTransaction(action::run);
-        BidService bidService = new BidService(itemRepo, bidRepo, userRepo, tx);
+        BidService bidService = new BidService(itemRepo, bidRepo, userRepo, autoBidRepo, tx);
         AuctionService auctionService = new AuctionService(itemRepo, userRepo, tx);
+        ItemEventBroadcaster eventBroadcaster = new ItemEventBroadcaster();
+        auctionService.setStatusChangeCallback(eventBroadcaster::broadcastItemsChanged);
 
         // Recover any RUNNING auctions left over from a previous server run:
         // close those whose end-time has passed, reschedule the rest.
@@ -46,13 +50,13 @@ public class ServerMain {
         }
 
         // Controllers
-        UserController userController = new UserController(userRepo, userService);
-        ItemController itemController = new ItemController(itemRepo, userRepo, itemService, auctionService);
-        BidController bidController = new BidController(bidRepo, userRepo, bidService);
-        AuctionController auctionController = new AuctionController(userRepo, auctionService);
+        UserController userController = new UserController(userRepo, itemRepo, autoBidRepo, userService);
+        ItemController itemController = new ItemController(itemRepo, userRepo, itemService, auctionService, eventBroadcaster);
+        BidController bidController = new BidController(bidRepo, userRepo, bidService, eventBroadcaster);
+        AuctionController auctionController = new AuctionController(userRepo, auctionService, eventBroadcaster);
 
         // Server
-        AuctionServer server = new AuctionServer(userController, itemController, bidController, auctionController);
+        AuctionServer server = new AuctionServer(userController, itemController, bidController, auctionController, eventBroadcaster);
         server.start(port);
 
         // Shutdown hook

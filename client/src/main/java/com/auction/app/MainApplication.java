@@ -44,7 +44,10 @@ public class MainApplication extends Application {
 
     @Override
     public void stop() {
-        if (appState != null) appState.auctionService.shutdown();
+        if (appState != null) {
+            appState.httpClient.disconnectEvents();
+            appState.auctionService.shutdown();
+        }
     }
 
     private AppState buildAppState() {
@@ -60,7 +63,7 @@ public class MainApplication extends Application {
         BidService bidService = new RestBidService(http);
         AuctionService auctionService = new RestAuctionService(http);
 
-        return new AppState(userRepo, itemRepo, userService, itemService,
+        return new AppState(http, userRepo, itemRepo, userService, itemService,
                 bidService, auctionService, userService);
     }
 

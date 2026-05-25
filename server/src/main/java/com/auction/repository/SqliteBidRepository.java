@@ -44,7 +44,7 @@ public class SqliteBidRepository implements BidRepository {
 
     @Override
     public List<Bid> findByItemId(String itemId) {
-        String sql = "SELECT * FROM bids WHERE item_id = ? ORDER BY amount ASC";
+        String sql = "SELECT * FROM bids WHERE item_id = ? ORDER BY timestamp ASC, id ASC";
         return query(sql, itemId);
     }
 
