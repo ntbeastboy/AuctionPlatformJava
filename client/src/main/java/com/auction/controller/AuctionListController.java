@@ -303,32 +303,11 @@ public class AuctionListController {
         }
         Stage detailStage = new Stage();
         detailStage.setTitle("Item Details");
-        // set cấu hình cửa sổ
-        NumberAxis xAxis = new NumberAxis();
-        NumberAxis yAxis = new NumberAxis();
-        xAxis.setLabel("Time");
-        yAxis.setLabel("Price");
-        LineChart<Number, Number> chart = new LineChart<>(xAxis, yAxis);
         VBox root = new VBox();
-        grid.setPadding(new Insets(13));chart.setPrefHeight(400);
-        XYChart.Series<Number, Number> series = new XYChart.Series<>();
-        series.getData().add(new XYChart.Data<>(1, 100));
-        series.getData().add(new XYChart.Data<>(2, 120));
-        series.getData().add(new XYChart.Data<>(3, 150));
-        series.getData().add(new XYChart.Data<>(4, 130));
-        chart.getData().add(series);
-        root.getChildren().addAll(grid,chart);
-        Scene scene = new Scene(root, 900, 700);
+        grid.setPadding(new Insets(13));
+        root.getChildren().add(grid);
+        Scene scene = new Scene(root, 300, 400);
         detailStage.setScene(scene);
-        // kẻ chart
-
-
-
-
-
-
-        detailStage.setScene(scene);
-
         detailStage.show();
     }
 
