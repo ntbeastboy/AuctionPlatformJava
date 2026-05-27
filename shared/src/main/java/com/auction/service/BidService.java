@@ -43,8 +43,9 @@ public class BidService {
     private static final long ANTI_SNIPING_WINDOW_SECONDS = 10L;
     private static final long ANTI_SNIPING_EXTENSION_SECONDS = 60L;
     private static final Comparator<AutoBid> AUTO_BID_PRIORITY =
-            Comparator.comparingDouble(AutoBid::getMaxBid).reversed()
-                    .thenComparingLong(AutoBid::getCreatedAt);
+            Comparator.comparingLong(AutoBid::getNextCheckAt)
+                    .thenComparing(Comparator.comparingDouble(AutoBid::getMaxBid).reversed())
+                    .thenComparing(AutoBid::getUserId, BidService::compareUserIds);
 
     private final ItemRepository itemRepository;
     private final BidRepository bidRepository;
@@ -53,7 +54,7 @@ public class BidService {
     private final TransactionRunner txRunner;
     private final LongSupplier currentTimeMillis;
     private final ScheduledExecutorService autoBidScheduler;
-    private final Set<String> scheduledCooldownItems = ConcurrentHashMap.newKeySet();
+    private final Map<String, Long> scheduledRetryAtByItem = new ConcurrentHashMap<>();
     private Consumer<String> itemUpdateCallback;
 
     public BidService(ItemRepository itemRepository, BidRepository bidRepository,
@@ -146,7 +147,7 @@ public class BidService {
                 item.setCurrentWinnerId(freshUser.getId());
                 applyAntiSnipingExtension(item);
 
-                bid = new Bid(freshUser.getId(), itemId, amount);
+                bid = new Bid(freshUser.getId(), itemId, amount, currentTimeMillis.getAsLong());
                 runInTx(() -> {
                     itemRepository.update(item);
                     bidRepository.save(bid);
@@ -217,7 +218,10 @@ public class BidService {
                 long lastBidAt = existingAutoBid
                         .map(AutoBid::getLastBidAt)
                         .orElse(0L);
-                autoBid = new AutoBid(user.getId(), itemId, maxBid, increment, createdAt, lastBidAt);
+                long nextCheckAt = existingAutoBid
+                        .map(AutoBid::getNextCheckAt)
+                        .orElse(createdAt);
+                autoBid = new AutoBid(user.getId(), itemId, maxBid, increment, createdAt, lastBidAt, nextCheckAt);
                 runInTx(() -> autoBidRepository.save(autoBid));
             } finally {
                 itemLock.unlock();
@@ -297,9 +301,9 @@ public class BidService {
     private AutoBidResolution resolveAutoBidsLocked(String itemId) {
         int safetyLimit = 100;
         boolean changed = false;
-        Set<String> skippedUserIds = new HashSet<>();
 
         while (safetyLimit-- > 0) {
+            long now = currentTimeMillis.getAsLong();
             Item item = itemRepository.findById(itemId)
                     .orElseThrow(() -> new ProductNotFoundException("Item not found: " + itemId));
 
@@ -310,59 +314,119 @@ public class BidService {
             List<AutoBid> autoBids = autoBidRepository.findByItemId(itemId);
             AutoBid currentWinnerAutoBid = currentWinnerAutoBid(item, autoBids).orElse(null);
             List<AutoBid> candidates = autoBids.stream()
-                    .filter(a -> !a.getUserId().equals(item.getCurrentWinnerId()))
-                    .filter(a -> !a.getUserId().equals(item.getSellerId()))
-                    .filter(a -> !skippedUserIds.contains(a.getUserId()))
-                    .filter(a -> autoBidAmount(a, item, currentWinnerAutoBid).isPresent())
+                    .filter(a -> nextCheckAt(a) <= now)
                     .sorted(AUTO_BID_PRIORITY)
                     .toList();
 
+            if (candidates.isEmpty()) {
+                return new AutoBidResolution(changed, nextRetryAt(autoBids, now));
+            }
+
             boolean placed = false;
-            long now = currentTimeMillis.getAsLong();
-            OptionalLong nextRetryAt = OptionalLong.empty();
+            boolean advanced = false;
             for (AutoBid autoBid : candidates) {
-                OptionalLong cooldownReadyAt = cooldownReadyAt(autoBid, now);
-                if (cooldownReadyAt.isPresent()) {
-                    nextRetryAt = earliest(nextRetryAt, cooldownReadyAt.getAsLong());
-                    continue;
+                long checkAt = nextCheckAt(autoBid);
+                long nextCheckAt = nextFutureCheckAt(autoBid, now);
+
+                if (autoBid.getUserId().equals(item.getCurrentWinnerId())
+                        || autoBid.getUserId().equals(item.getSellerId())) {
+                    List<AutoBid> sameCheckLowerPriority = autoBid.getUserId().equals(item.getCurrentWinnerId())
+                            ? lowerPriorityAutoBidsAtSameCheck(autoBids, autoBid, checkAt)
+                            : List.of();
+                    advanceAutoBidChecks(autoBid, nextCheckAt, sameCheckLowerPriority, now);
+                    advanced = true;
+                    break;
                 }
 
-                double amount = autoBidAmount(autoBid, item, currentWinnerAutoBid).orElseThrow();
+                Optional<Double> bidAmount = autoBidAmount(autoBid, item, currentWinnerAutoBid);
+                if (bidAmount.isEmpty()) {
+                    advanceAutoBidChecks(autoBid, nextCheckAt,
+                            lowerPriorityAutoBidsAtSameCheck(autoBids, autoBid, checkAt), now);
+                    advanced = true;
+                    break;
+                }
+
+                double amount = bidAmount.orElseThrow();
                 User user = userRepository.findById(autoBid.getUserId())
                         .orElseThrow(() -> new UserNotFoundException("User not found: " + autoBid.getUserId()));
                 if (availableBalance(user, itemId) < amount) {
-                    skippedUserIds.add(autoBid.getUserId());
+                    advanceAutoBidCheck(autoBid, nextCheckAt);
+                    advanced = true;
                     continue;
                 }
 
                 item.setCurrentPrice(amount);
                 item.setCurrentWinnerId(autoBid.getUserId());
                 applyAntiSnipingExtension(item);
-                Bid bid = new Bid(autoBid.getUserId(), itemId, amount);
-                long bidAt = now;
+                Bid bid = new Bid(autoBid.getUserId(), itemId, amount, now);
+                List<AutoBid> sameCheckLowerPriority = lowerPriorityAutoBidsAtSameCheck(autoBids, autoBid, checkAt);
                 runInTx(() -> {
                     itemRepository.update(item);
                     bidRepository.save(bid);
                     userRepository.save(user);
-                    autoBidRepository.recordBid(autoBid.getUserId(), itemId, bidAt);
+                    autoBidRepository.recordBid(autoBid.getUserId(), itemId, now, nextCheckAt);
+                    for (AutoBid other : sameCheckLowerPriority) {
+                        autoBidRepository.recordCheck(other.getUserId(), itemId, nextFutureCheckAt(other, now));
+                    }
                 });
-                skippedUserIds.clear();
                 placed = true;
                 changed = true;
                 break;
             }
 
-            if (!placed) return new AutoBidResolution(changed, nextRetryAt);
+            if (!placed && !advanced) return new AutoBidResolution(changed, nextRetryAt(autoBids, now));
         }
 
         throw new IllegalStateException("Auto-bid resolution did not settle.");
     }
 
-    private OptionalLong cooldownReadyAt(AutoBid autoBid, long now) {
-        long lastBidAt = autoBid.getLastBidAt();
-        if (lastBidAt <= 0) return OptionalLong.empty();
-        long readyAt = lastBidAt + AUTO_BID_COOLDOWN_MS;
-        return now < readyAt ? OptionalLong.of(readyAt) : OptionalLong.empty();
+    private void advanceAutoBidCheck(AutoBid autoBid, long nextCheckAt) {
+        if (autoBid.getNextCheckAt() == nextCheckAt) return;
+        runInTx(() -> autoBidRepository.recordCheck(autoBid.getUserId(), autoBid.getItemId(), nextCheckAt));
+    }
+
+    private void advanceAutoBidChecks(AutoBid autoBid, long nextCheckAt,
+                                      List<AutoBid> sameCheckLowerPriority, long now) {
+        if (sameCheckLowerPriority.isEmpty()) {
+            advanceAutoBidCheck(autoBid, nextCheckAt);
+            return;
+        }
+
+        runInTx(() -> {
+            autoBidRepository.recordCheck(autoBid.getUserId(), autoBid.getItemId(), nextCheckAt);
+            for (AutoBid other : sameCheckLowerPriority) {
+                autoBidRepository.recordCheck(other.getUserId(), other.getItemId(), nextFutureCheckAt(other, now));
+            }
+        });
+    }
+
+    private List<AutoBid> lowerPriorityAutoBidsAtSameCheck(List<AutoBid> autoBids, AutoBid winner, long checkAt) {
+        return autoBids.stream()
+                .filter(a -> !a.getUserId().equals(winner.getUserId()))
+                .filter(a -> nextCheckAt(a) == checkAt)
+                .filter(a -> AUTO_BID_PRIORITY.compare(winner, a) < 0)
+                .toList();
+    }
+
+    private OptionalLong nextRetryAt(List<AutoBid> autoBids, long now) {
+        OptionalLong nextRetryAt = OptionalLong.empty();
+        for (AutoBid autoBid : autoBids) {
+            long checkAt = nextCheckAt(autoBid);
+            if (checkAt <= now) checkAt = nextFutureCheckAt(autoBid, now);
+            nextRetryAt = earliest(nextRetryAt, checkAt);
+        }
+        return nextRetryAt;
+    }
+
+    private long nextCheckAt(AutoBid autoBid) {
+        return autoBid.getNextCheckAt() > 0L ? autoBid.getNextCheckAt() : autoBid.getCreatedAt();
+    }
+
+    private long nextFutureCheckAt(AutoBid autoBid, long now) {
+        long nextCheckAt = nextCheckAt(autoBid);
+        if (nextCheckAt > now) return nextCheckAt;
+        long checksToSkip = ((now - nextCheckAt) / AUTO_BID_COOLDOWN_MS) + 1;
+        return nextCheckAt + checksToSkip * AUTO_BID_COOLDOWN_MS;
     }
 
     private OptionalLong earliest(OptionalLong current, long value) {
@@ -371,10 +435,14 @@ public class BidService {
     }
 
     private void scheduleAutoBidRetry(String itemId, long retryAt) {
-        if (autoBidScheduler == null || !scheduledCooldownItems.add(itemId)) return;
+        if (autoBidScheduler == null) return;
+        Long existingRetryAt = scheduledRetryAtByItem.get(itemId);
+        if (existingRetryAt != null && existingRetryAt <= retryAt) return;
+        scheduledRetryAtByItem.put(itemId, retryAt);
+
         long delayMs = Math.max(0L, retryAt - currentTimeMillis.getAsLong());
         autoBidScheduler.schedule(() -> {
-            scheduledCooldownItems.remove(itemId);
+            if (!scheduledRetryAtByItem.remove(itemId, retryAt)) return;
             try {
                 resolveAutoBids(itemId, true);
             } catch (Exception e) {
@@ -465,6 +533,17 @@ public class BidService {
     private void requireAutoBidRepository() {
         if (autoBidRepository == null)
             throw new UnsupportedOperationException("Auto-bidding is not available for this BidService.");
+    }
+
+    private static int compareUserIds(String left, String right) {
+        if (left == null && right == null) return 0;
+        if (left == null) return -1;
+        if (right == null) return 1;
+        try {
+            return Long.compare(Long.parseLong(left), Long.parseLong(right));
+        } catch (NumberFormatException ignored) {
+            return left.compareTo(right);
+        }
     }
 
     private record AutoBidResolution(boolean changed, OptionalLong nextRetryAt) {}

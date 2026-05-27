@@ -103,7 +103,8 @@ public final class JsonMappers {
                 num(map, "maxBid"),
                 num(map, "increment"),
                 Math.round(num(map, "createdAt")),
-                Math.round(num(map, "lastBidAt"))
+                Math.round(num(map, "lastBidAt")),
+                Math.round(num(map, "nextCheckAt"))
         );
     }
 

@@ -129,6 +129,7 @@ public class DatabaseManager {
                     increment REAL NOT NULL,
                     created_at INTEGER NOT NULL,
                     last_bid_at INTEGER NOT NULL DEFAULT 0,
+                    next_check_at INTEGER NOT NULL,
                     PRIMARY KEY (user_id, item_id)
                 )
             """);

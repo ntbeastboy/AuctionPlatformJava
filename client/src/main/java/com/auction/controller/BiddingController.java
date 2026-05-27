@@ -62,10 +62,10 @@ public class BiddingController {
 
 
     public void setItem(String itemId) {
-        long startSeconds = item.getBidStartTime() != null
-                ? item.getBidStartTime().atZone(ZoneId.systemDefault()).toEpochSecond()
-                : System.currentTimeMillis() / 1000L;
-        Bid bid = new Bid(item.getSellerId(), item.getId(), item.getStartingPrice(), startSeconds);
+        long startMillis = item.getBidStartTime() != null
+                ? item.getBidStartTime().atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+                : System.currentTimeMillis();
+        Bid bid = new Bid(item.getSellerId(), item.getId(), item.getStartingPrice(), startMillis);
         List<Bid> bids = new ArrayList<>(appState.bidService.getBidsForItem(itemId));
         bids.add(0, bid);
         loadChart(bids);
@@ -123,10 +123,8 @@ public class BiddingController {
 
         for (Bid bid : bids) {
 
-            long seconds = bid.getTimestamp();
-            long milliSeconds = seconds * 1000L;
             LocalDateTime dateTime = LocalDateTime.ofInstant(
-                    Instant.ofEpochMilli(milliSeconds),
+                    Instant.ofEpochMilli(bid.getTimestamp()),
                     ZoneId.systemDefault()
             );
             DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss");

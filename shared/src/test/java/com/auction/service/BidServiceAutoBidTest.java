@@ -74,6 +74,85 @@ class BidServiceAutoBidTest {
     }
 
     @Test
+    void autoBiddersKeepIndependentFiveSecondCadence() {
+        Fixture fx = new Fixture();
+
+        fx.service.setAutoBid(fx.alice, fx.item.getId(), 150.0, 10.0);
+        fx.clock.advance(2_000);
+        fx.service.setAutoBid(fx.bob, fx.item.getId(), 170.0, 10.0);
+
+        Item beforeAliceCheck = fx.items.findById(fx.item.getId()).orElseThrow();
+        assertEquals(fx.bob.getId(), beforeAliceCheck.getCurrentWinnerId());
+        assertEquals(120.0, beforeAliceCheck.getCurrentPrice());
+
+        fx.clock.advance(2_999);
+        fx.resolveAutoBids();
+
+        Item stillBeforeAliceCheck = fx.items.findById(fx.item.getId()).orElseThrow();
+        assertEquals(fx.bob.getId(), stillBeforeAliceCheck.getCurrentWinnerId());
+        assertEquals(120.0, stillBeforeAliceCheck.getCurrentPrice());
+
+        fx.clock.advance(1);
+        fx.resolveAutoBids();
+
+        Item afterAliceCheck = fx.items.findById(fx.item.getId()).orElseThrow();
+        assertEquals(fx.alice.getId(), afterAliceCheck.getCurrentWinnerId());
+        assertEquals(130.0, afterAliceCheck.getCurrentPrice());
+
+        List<Bid> bids = fx.bids.findByItemId(fx.item.getId());
+        assertEquals(3, bids.size());
+        assertEquals(1_000_000L, bids.get(0).getTimestamp());
+        assertEquals(1_002_000L, bids.get(1).getTimestamp());
+        assertEquals(1_005_000L, bids.get(2).getTimestamp());
+    }
+
+    @Test
+    void sameCheckTimePrioritizesHigherMaxBid() {
+        Fixture fx = new Fixture();
+        long now = fx.clock.getAsLong();
+        fx.autoBids.save(new AutoBid(fx.alice.getId(), fx.item.getId(), 150.0, 10.0, now, 0L, now));
+        fx.autoBids.save(new AutoBid(fx.bob.getId(), fx.item.getId(), 200.0, 10.0, now, 0L, now));
+
+        fx.resolveAutoBids();
+
+        Item item = fx.items.findById(fx.item.getId()).orElseThrow();
+        assertEquals(fx.bob.getId(), item.getCurrentWinnerId());
+        assertEquals(110.0, item.getCurrentPrice());
+
+        List<Bid> bids = fx.bids.findByItemId(fx.item.getId());
+        assertEquals(1, bids.size());
+        assertEquals(fx.bob.getId(), bids.get(0).getBidderId());
+    }
+
+    @Test
+    void sameCheckTimeAndSameMaxBidPrioritizesSmallerUserId() {
+        Fixture fx = new Fixture();
+        Bidder userOne = new Bidder("1", "one", "pw");
+        Bidder userTwo = new Bidder("2", "two", "pw");
+        userOne.addFunds(1000.0);
+        userTwo.addFunds(1000.0);
+        fx.users.save(userOne);
+        fx.users.save(userTwo);
+
+        long now = fx.clock.getAsLong();
+        fx.autoBids.save(new AutoBid(userTwo.getId(), fx.item.getId(), 150.0, 10.0, now, 0L, now));
+        fx.autoBids.save(new AutoBid(userOne.getId(), fx.item.getId(), 150.0, 10.0, now, 0L, now));
+
+        fx.resolveAutoBids();
+
+        Item item = fx.items.findById(fx.item.getId()).orElseThrow();
+        assertEquals(userOne.getId(), item.getCurrentWinnerId());
+        assertEquals(110.0, item.getCurrentPrice());
+
+        fx.clock.advance(5_000);
+        fx.resolveAutoBids();
+
+        Item afterNextSharedCheck = fx.items.findById(fx.item.getId()).orElseThrow();
+        assertEquals(userOne.getId(), afterNextSharedCheck.getCurrentWinnerId());
+        assertEquals(110.0, afterNextSharedCheck.getCurrentPrice());
+    }
+
+    @Test
     void autoBidIncrementMustMeetItemPriceStep() {
         Fixture fx = new Fixture();
 

@@ -12,14 +12,27 @@ public interface AutoBidRepository {
     List<AutoBid> findByUserId(String userId);
     void delete(String userId, String itemId);
 
-    default void recordBid(String userId, String itemId, long bidAt) {
+    default void recordBid(String userId, String itemId, long bidAt, long nextCheckAt) {
         findByUserAndItem(userId, itemId).ifPresent(autoBid -> save(new AutoBid(
                 autoBid.getUserId(),
                 autoBid.getItemId(),
                 autoBid.getMaxBid(),
                 autoBid.getIncrement(),
                 autoBid.getCreatedAt(),
-                bidAt
+                bidAt,
+                nextCheckAt
+        )));
+    }
+
+    default void recordCheck(String userId, String itemId, long nextCheckAt) {
+        findByUserAndItem(userId, itemId).ifPresent(autoBid -> save(new AutoBid(
+                autoBid.getUserId(),
+                autoBid.getItemId(),
+                autoBid.getMaxBid(),
+                autoBid.getIncrement(),
+                autoBid.getCreatedAt(),
+                autoBid.getLastBidAt(),
+                nextCheckAt
         )));
     }
 }
