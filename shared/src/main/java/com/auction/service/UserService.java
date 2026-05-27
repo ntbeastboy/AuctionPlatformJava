@@ -8,6 +8,7 @@ import com.auction.model.User;
 import com.auction.repository.UserRepository;
 import com.auction.security.PasswordUtil;
 
+import java.util.Optional;
 import java.util.UUID;
 
 public class UserService {
@@ -52,4 +53,6 @@ public class UserService {
 
         return user;
     }
+    
+    public Optional<User> findById(String bidderId) { return userRepository.findById(bidderId);}
 }

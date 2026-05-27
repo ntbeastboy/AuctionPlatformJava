@@ -53,10 +53,18 @@
         </children>
     </HBox>
 
-
-
-
     <Separator/>
+
+    <TableView fx:id="bidTable" VBox.vgrow="ALWAYS" styleClass="item-table">
+        <columns>
+            <TableColumn fx:id="colBidder"   text="Bidder"    prefWidth="160"/>
+            <TableColumn fx:id="colPrice"    text="Price"     prefWidth="90"/>
+            <TableColumn fx:id="colTime"     text="Time"      prefWidth="90"/>
+        </columns>
+        <columnResizePolicy>
+            <TableView fx:constant="CONSTRAINED_RESIZE_POLICY"/>
+        </columnResizePolicy>
+    </TableView>
 
     <GridPane hgap="12" vgap="8">
         <Label text="Auto-bid max:" GridPane.rowIndex="0" GridPane.columnIndex="0"/>

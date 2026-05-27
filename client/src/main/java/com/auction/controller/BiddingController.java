@@ -3,24 +3,24 @@ package com.auction.controller;
 import com.auction.app.AppState;
 import com.auction.model.*;
 import javafx.application.Platform;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Scene;
 import javafx.scene.chart.LineChart;
 import javafx.scene.chart.XYChart;
-import javafx.scene.control.Label;
-import javafx.scene.control.TextField;
+import javafx.scene.control.*;
+import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.stage.Stage;
+import java.util.Optional;
 
 import java.io.IOException;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 import java.util.function.Consumer;
 
 public class BiddingController {
@@ -40,6 +40,10 @@ public class BiddingController {
     @FXML private Label autoBidInfoLabel;
     @FXML private Label statusLabel;
     @FXML private LineChart<String, Number> priceChart;
+    @FXML private TableView<Bid> bidTable;
+    @FXML private TableColumn<Bid, String> colBidder;
+    @FXML private TableColumn<Bid, Double> colPrice;
+    @FXML private TableColumn<Bid, Long> colTime;
 
     private AppState appState;
     private Stage stage;
@@ -56,6 +60,7 @@ public class BiddingController {
         registerRealtimeUpdates();
     }
 
+
     public void setItem(String itemId) {
         long startSeconds = item.getBidStartTime() != null
                 ? item.getBidStartTime().atZone(ZoneId.systemDefault()).toEpochSecond()
@@ -64,6 +69,49 @@ public class BiddingController {
         List<Bid> bids = new ArrayList<>(appState.bidService.getBidsForItem(itemId));
         bids.add(0, bid);
         loadChart(bids);
+        setupTable(bids);
+    }
+
+    private void setupTable(List<Bid> bids) {
+        colBidder.setCellValueFactory(new PropertyValueFactory<>("bidderId"));
+        colPrice.setCellValueFactory(new PropertyValueFactory<>("amount"));
+        colTime.setCellValueFactory(new PropertyValueFactory<>("timestamp"));
+        colBidder.setCellFactory(column -> new TableCell<Bid, String>() {
+            @Override
+            protected void updateItem(String bidderId, boolean empty) {
+                super.updateItem(bidderId, empty);
+                Optional<User> user = appState.userService.findById(bidderId);
+                if (empty || user.isEmpty()) {
+                    setText(null);
+                } else {
+                    String bidderName = user.map(User::getUsername).orElse("User #" + bidderId);
+                    setText(bidderName);
+                }
+            }
+        });
+        colTime.setCellFactory(column -> new TableCell<Bid, Long>() {
+            private final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss");
+            @Override
+            protected void updateItem(Long timestamp, boolean empty) {
+                super.updateItem(timestamp, empty);
+                if (empty || timestamp == null) {
+                    setText(null);
+                } else {
+                    LocalDateTime dateTime = LocalDateTime.ofInstant(
+                            Instant.ofEpochMilli(timestamp),
+                            ZoneId.systemDefault()
+                    );
+                    setText(dateTime.format(formatter));
+                }
+            }
+        });
+
+        colBidder.setStyle("-fx-alignment: CENTER;");
+        colPrice.setStyle("-fx-alignment: CENTER;");
+        colTime.setStyle("-fx-alignment: CENTER;");
+
+        ObservableList<Bid> bidObservableList = FXCollections.observableArrayList(bids);
+        bidTable.setItems(bidObservableList);
     }
 
     private void loadChart(List<Bid> bids) {
