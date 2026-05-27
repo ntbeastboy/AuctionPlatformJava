@@ -20,6 +20,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.LongSupplier;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -27,28 +28,49 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 class BidServiceAutoBidTest {
 
     @Test
-    void equalMaxBidKeepsEarlierAutoBidderAhead() throws Exception {
+    void equalMaxBidKeepsEarlierAutoBidderAheadAfterCooldown() {
         Fixture fx = new Fixture();
 
-        fx.service.setAutoBid(fx.alice, fx.item.getId(), 200.0, 10.0);
-        Thread.sleep(2);
-        fx.service.setAutoBid(fx.bob, fx.item.getId(), 200.0, 10.0);
+        fx.service.setAutoBid(fx.alice, fx.item.getId(), 120.0, 10.0);
+        fx.clock.advance(1);
+        fx.service.setAutoBid(fx.bob, fx.item.getId(), 120.0, 10.0);
+
+        Item beforeCooldown = fx.items.findById(fx.item.getId()).orElseThrow();
+        assertEquals(fx.bob.getId(), beforeCooldown.getCurrentWinnerId());
+        assertEquals(120.0, beforeCooldown.getCurrentPrice());
+
+        fx.clock.advance(4_999);
+        fx.resolveAutoBids();
 
         Item item = fx.items.findById(fx.item.getId()).orElseThrow();
         assertEquals(fx.alice.getId(), item.getCurrentWinnerId());
-        assertEquals(200.0, item.getCurrentPrice());
+        assertEquals(120.0, item.getCurrentPrice());
     }
 
     @Test
-    void manualBidTriggersAutoBidResponse() {
+    void manualBidTriggersAutoBidResponseAfterCooldownExpires() {
         Fixture fx = new Fixture();
         fx.service.setAutoBid(fx.alice, fx.item.getId(), 150.0, 10.0);
+        fx.clock.advance(5_000);
 
         fx.service.placeBid(fx.bob, fx.item.getId(), 120.0);
 
         Item item = fx.items.findById(fx.item.getId()).orElseThrow();
         assertEquals(fx.alice.getId(), item.getCurrentWinnerId());
         assertEquals(130.0, item.getCurrentPrice());
+    }
+
+    @Test
+    void manualBidDoesNotTriggerAutoBidResponseDuringCooldown() {
+        Fixture fx = new Fixture();
+        fx.service.setAutoBid(fx.alice, fx.item.getId(), 150.0, 10.0);
+        fx.clock.advance(1_000);
+
+        fx.service.placeBid(fx.bob, fx.item.getId(), 120.0);
+
+        Item item = fx.items.findById(fx.item.getId()).orElseThrow();
+        assertEquals(fx.bob.getId(), item.getCurrentWinnerId());
+        assertEquals(120.0, item.getCurrentPrice());
     }
 
     @Test
@@ -64,7 +86,8 @@ class BidServiceAutoBidTest {
         final InMemoryItemRepository items = new InMemoryItemRepository();
         final InMemoryBidRepository bids = new InMemoryBidRepository();
         final InMemoryAutoBidRepository autoBids = new InMemoryAutoBidRepository();
-        final BidService service = new BidService(items, bids, users, autoBids, null);
+        final MutableClock clock = new MutableClock();
+        final BidService service = new BidService(items, bids, users, autoBids, null, clock);
         final Seller seller = new Seller("seller", "seller", "pw");
         final Bidder alice = new Bidder("alice", "alice", "pw");
         final Bidder bob = new Bidder("bob", "bob", "pw");
@@ -80,6 +103,23 @@ class BidServiceAutoBidTest {
             item.setStatus(com.auction.model.AuctionStatus.RUNNING);
             items.save(item);
         }
+
+        void resolveAutoBids() {
+            try {
+                var method = BidService.class.getDeclaredMethod("resolveAutoBids", String.class);
+                method.setAccessible(true);
+                method.invoke(service, item.getId());
+            } catch (ReflectiveOperationException e) {
+                throw new AssertionError(e);
+            }
+        }
+    }
+
+    private static class MutableClock implements LongSupplier {
+        private long now = 1_000_000L;
+
+        @Override public long getAsLong() { return now; }
+        void advance(long millis) { now += millis; }
     }
 
     private static class InMemoryUserRepository implements UserRepository {

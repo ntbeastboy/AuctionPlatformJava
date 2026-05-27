@@ -219,11 +219,7 @@ public class SqliteItemRepository implements ItemRepository {
     }
 
     private String itemType(Item item) {
-        if (item instanceof Art) return "Art";
-        if (item instanceof Electronics) return "Electronics";
-        if (item instanceof Vehicle) return "Vehicle";
-        if (item instanceof AuctionItem) return "AuctionItem";
-        return "Other";
+        return item.getTypeName();
     }
 
     private void setNullableInt(PreparedStatement ps, int idx, Integer val) throws SQLException {

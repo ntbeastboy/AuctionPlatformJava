@@ -73,6 +73,6 @@ public abstract class Item implements Entity {
 
     public void setVersion(long version) { this.version = version; }
 
-
+    public abstract String getTypeName();
 
 }

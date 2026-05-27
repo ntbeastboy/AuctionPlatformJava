@@ -2,13 +2,19 @@ package com.auction.repository;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
-import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 
 public class DatabaseManager {
 
+    private static DatabaseManager instance;
+
     private final Connection connection;
+
+    public static synchronized DatabaseManager getInstance(String dbPath) {
+        if (instance == null) instance = new DatabaseManager(dbPath);
+        return instance;
+    }
 
     public DatabaseManager(String dbPath) {
         try {
@@ -20,7 +26,6 @@ public class DatabaseManager {
                 stmt.execute("PRAGMA journal_mode = WAL");
             }
             createTables();
-            migrate();
         } catch (SQLException e) {
             throw new RuntimeException("Failed to initialize SQLite database: " + e.getMessage(), e);
         }
@@ -123,6 +128,7 @@ public class DatabaseManager {
                     max_bid REAL NOT NULL,
                     increment REAL NOT NULL,
                     created_at INTEGER NOT NULL,
+                    last_bid_at INTEGER NOT NULL DEFAULT 0,
                     PRIMARY KEY (user_id, item_id)
                 )
             """);
@@ -131,28 +137,6 @@ public class DatabaseManager {
             stmt.executeUpdate("CREATE INDEX IF NOT EXISTS idx_bids_bidder_id ON bids(bidder_id)");
             stmt.executeUpdate("CREATE INDEX IF NOT EXISTS idx_auto_bids_item_id ON auto_bids(item_id)");
             stmt.executeUpdate("CREATE INDEX IF NOT EXISTS idx_auto_bids_user_id ON auto_bids(user_id)");
-        }
-    }
-
-    /**
-     * Backfill schema changes for databases created by older builds.
-     * Currently: ensures the items.version column exists.
-     */
-    private void migrate() throws SQLException {
-        if (!columnExists("items", "version")) {
-            try (Statement stmt = connection.createStatement()) {
-                stmt.executeUpdate("ALTER TABLE items ADD COLUMN version INTEGER NOT NULL DEFAULT 0");
-            }
-        }
-    }
-
-    private boolean columnExists(String table, String column) throws SQLException {
-        try (Statement stmt = connection.createStatement();
-             ResultSet rs = stmt.executeQuery("PRAGMA table_info(" + table + ")")) {
-            while (rs.next()) {
-                if (column.equalsIgnoreCase(rs.getString("name"))) return true;
-            }
-            return false;
         }
     }
 

@@ -21,12 +21,13 @@ public class SqliteAutoBidRepository implements AutoBidRepository {
     @Override
     public void save(AutoBid autoBid) {
         String sql = """
-            INSERT INTO auto_bids (user_id, item_id, max_bid, increment, created_at)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO auto_bids (user_id, item_id, max_bid, increment, created_at, last_bid_at)
+            VALUES (?, ?, ?, ?, ?, ?)
             ON CONFLICT(user_id, item_id) DO UPDATE SET
                 max_bid = excluded.max_bid,
                 increment = excluded.increment,
-                created_at = auto_bids.created_at
+                created_at = auto_bids.created_at,
+                last_bid_at = auto_bids.last_bid_at
         """;
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, autoBid.getUserId());
@@ -34,6 +35,7 @@ public class SqliteAutoBidRepository implements AutoBidRepository {
             ps.setDouble(3, autoBid.getMaxBid());
             ps.setDouble(4, autoBid.getIncrement());
             ps.setLong(5, autoBid.getCreatedAt());
+            ps.setLong(6, autoBid.getLastBidAt());
             ps.executeUpdate();
         } catch (SQLException e) {
             throw new RuntimeException("Failed to save auto-bid: " + e.getMessage(), e);
@@ -78,6 +80,19 @@ public class SqliteAutoBidRepository implements AutoBidRepository {
         }
     }
 
+    @Override
+    public void recordBid(String userId, String itemId, long bidAt) {
+        String sql = "UPDATE auto_bids SET last_bid_at = ? WHERE user_id = ? AND item_id = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setLong(1, bidAt);
+            ps.setString(2, userId);
+            ps.setString(3, itemId);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to update auto-bid cooldown: " + e.getMessage(), e);
+        }
+    }
+
     private List<AutoBid> query(String sql, String param) {
         List<AutoBid> result = new ArrayList<>();
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -96,7 +111,8 @@ public class SqliteAutoBidRepository implements AutoBidRepository {
                 rs.getString("item_id"),
                 rs.getDouble("max_bid"),
                 rs.getDouble("increment"),
-                rs.getLong("created_at")
+                rs.getLong("created_at"),
+                rs.getLong("last_bid_at")
         );
     }
 }

@@ -24,6 +24,8 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.UUID;
 import java.util.function.Consumer;
 
@@ -43,6 +45,7 @@ public class AuctionListController {
     @FXML private TableColumn<Item, String>        colEndTime;
     @FXML private TableColumn<Item, String>        colWinner;
     @FXML private Button createItemBtn;
+    @FXML private Button editItemBtn;
     @FXML private Button startBtn;
     @FXML private Button endEarlyBtn;
     @FXML private Button cancelBtn;
@@ -110,9 +113,9 @@ public class AuctionListController {
 
     private void configureRoleButtons() {
         if (appState.currentUser instanceof Admin) {
-            show(startBtn, endEarlyBtn, cancelBtn, deleteBtn);
+            show(editItemBtn, startBtn, endEarlyBtn, cancelBtn, deleteBtn);
         } else if (appState.currentUser instanceof Seller) {
-            show(addFundsBtn, withdrawBtn, createItemBtn, startBtn, placeBidBtn);
+            show(addFundsBtn, withdrawBtn, createItemBtn, editItemBtn, deleteBtn, startBtn, placeBidBtn);
         } else if (appState.currentUser instanceof Bidder) {
             show(addFundsBtn, withdrawBtn, placeBidBtn);
         }
@@ -121,8 +124,6 @@ public class AuctionListController {
     private void show(javafx.scene.Node... nodes) {
         for (javafx.scene.Node n : nodes) { n.setVisible(true); n.setManaged(true); }
     }
-
-    @FXML private void onRefresh() { refreshTable(); }
 
     @FXML
     private void onLogout() throws IOException {
@@ -192,11 +193,30 @@ public class AuctionListController {
 
     @FXML
     private void onCreateItem() {
-        buildCreateItemDialog().showAndWait().ifPresent(item -> {
+        buildItemDialog(null).showAndWait().ifPresent(item -> {
             try {
                 appState.itemService.createItem(appState.currentUser, item);
                 refreshTable();
                 showStatus("Item \"" + item.getName() + "\" created.", false);
+            } catch (Exception e) {
+                showStatus(e.getMessage(), true);
+            }
+        });
+    }
+
+    @FXML
+    private void onEditItem() {
+        Item selected = itemTable.getSelectionModel().getSelectedItem();
+        if (selected == null) { showStatus("Select an item first.", true); return; }
+        if (selected.getStatus() != AuctionStatus.OPEN) {
+            showStatus("Only OPEN items can be edited.", true);
+            return;
+        }
+        buildItemDialog(selected).showAndWait().ifPresent(item -> {
+            try {
+                appState.itemService.updateItem(appState.currentUser, item);
+                refreshTable();
+                showStatus("Item \"" + item.getName() + "\" updated.", false);
             } catch (Exception e) {
                 showStatus(e.getMessage(), true);
             }
@@ -343,10 +363,7 @@ public class AuctionListController {
     }
 
     private String typeName(Item item) {
-        if (item instanceof Art)         return "Art";
-        if (item instanceof Electronics) return "Electronics";
-        if (item instanceof Vehicle)     return "Vehicle";
-        return "Other";
+        return item.getTypeName();
     }
 
     // ── Credit Card Dialog ────────────────────────────────────────────────────
@@ -496,12 +513,13 @@ public class AuctionListController {
 
     // ── Create Item Dialog ────────────────────────────────────────────────────
 
-    private Dialog<Item> buildCreateItemDialog() {
+    private Dialog<Item> buildItemDialog(Item existing) {
+        boolean editing = existing != null;
         Dialog<Item> dlg = new Dialog<>();
-        dlg.setTitle("Create New Item");
+        dlg.setTitle(editing ? "Edit Item" : "Create New Item");
         dlg.setHeaderText("Fill in item details");
 
-        ButtonType createBtn = new ButtonType("Create", ButtonBar.ButtonData.OK_DONE);
+        ButtonType createBtn = new ButtonType(editing ? "Save" : "Create", ButtonBar.ButtonData.OK_DONE);
         dlg.getDialogPane().getButtonTypes().addAll(createBtn, ButtonType.CANCEL);
 
         TextField nameF         = field("Name");
@@ -509,15 +527,38 @@ public class AuctionListController {
         TextField startPriceF   = field("0");
         TextField priceStepF    = field("1");
         TextField durationMinsF = field("60");
+        if (editing) {
+            nameF.setText(existing.getName());
+            descF.setText(existing.getDescription());
+            startPriceF.setText(String.format("%.2f", existing.getStartingPrice()));
+            priceStepF.setText(String.format("%.2f", existing.getPriceStep()));
+            durationMinsF.setText(String.valueOf(durationMinutes(existing)));
+        }
 
         ComboBox<String> typeBox = new ComboBox<>(
                 FXCollections.observableArrayList("Other", "Art", "Electronics", "Vehicle"));
-        typeBox.setValue("Other");
+        typeBox.setValue(editing ? typeName(existing) : "Other");
 
         TextField artistF = field("Artist");        TextField styleF = field("Painting style"); TextField artOriginF = field("Origin");
         TextField wattageF = field("0");            TextField elecOriginF = field("Origin");    TextField warrantyF = field("12"); TextField serialF = field("Serial number");
         TextField milesF = field("0");              TextField mfgDateF = field("YYYY-MM-DD");   TextField brandF = field("Brand"); TextField vinF = field("VIN");
         CheckBox accidentBox = new CheckBox("Accident history");
+        if (existing instanceof Art a) {
+            artistF.setText(a.getArtist());
+            styleF.setText(a.getPaintingStyle());
+            artOriginF.setText(a.getOrigin());
+        } else if (existing instanceof Electronics e) {
+            wattageF.setText(String.valueOf(e.getWattage()));
+            elecOriginF.setText(e.getOrigin());
+            warrantyF.setText(String.valueOf(e.getWarrantyMonths()));
+            serialF.setText(e.getSerialNumber());
+        } else if (existing instanceof Vehicle v) {
+            milesF.setText(String.valueOf(v.getMiles()));
+            mfgDateF.setText(v.getManufacturingDate() != null ? v.getManufacturingDate().toString() : "");
+            brandF.setText(v.getBrand());
+            vinF.setText(v.getVin());
+            accidentBox.setSelected(v.hasAccidentHistory());
+        }
 
         GridPane grid = new GridPane();
         grid.setHgap(10); grid.setVgap(8);
@@ -555,7 +596,8 @@ public class AuctionListController {
                     grid.add(accidentBox,                  1, dr);
                 }
             }
-            dlg.getDialogPane().getScene().getWindow().sizeToScene();
+            if (dlg.getDialogPane().getScene() != null)
+                dlg.getDialogPane().getScene().getWindow().sizeToScene();
         });
 
         Label itemErrorLbl = new Label();
@@ -567,6 +609,7 @@ public class AuctionListController {
         // (and therefore never removed by the dynamic row cleanup)
         javafx.scene.layout.VBox content = new javafx.scene.layout.VBox(10, grid, itemErrorLbl);
         dlg.getDialogPane().setContent(content);
+        typeBox.getOnAction().handle(null);
 
         // Event filter: validate, show error and keep dialog open on failure
         javafx.scene.Node createNode = dlg.getDialogPane().lookupButton(createBtn);
@@ -584,34 +627,48 @@ public class AuctionListController {
         dlg.setResultConverter(btn -> {
             if (btn != createBtn) return null;
             try {
-                String id   = UUID.randomUUID().toString();
+                String id   = editing ? existing.getId() : UUID.randomUUID().toString();
                 String name = nameF.getText().trim();
                 String desc = descF.getText().trim();
                 double sp   = Double.parseDouble(startPriceF.getText().trim());
                 double step = Double.parseDouble(priceStepF.getText().trim());
                 int    mins = Integer.parseInt(durationMinsF.getText().trim());
-                LocalDateTime now = LocalDateTime.now();
-                LocalDateTime end = now.plusMinutes(mins);
-                String sid = appState.currentUser.getId();
+                LocalDateTime start = editing && existing.getBidStartTime() != null
+                        ? existing.getBidStartTime()
+                        : LocalDateTime.now();
+                LocalDateTime end = start.plusMinutes(mins);
+                String sid = editing ? existing.getSellerId() : appState.currentUser.getId();
+                Map<String, Object> attrs = new LinkedHashMap<>();
+                attrs.put("artist", artistF.getText().trim());
+                attrs.put("paintingStyle", styleF.getText().trim());
+                attrs.put("origin", typeBox.getValue().equals("Electronics") ? elecOriginF.getText().trim() : artOriginF.getText().trim());
+                attrs.put("wattage", wattageF.getText().trim().isBlank() ? 0 : Integer.parseInt(wattageF.getText().trim()));
+                attrs.put("warrantyMonths", warrantyF.getText().trim().isBlank() ? 0 : Integer.parseInt(warrantyF.getText().trim()));
+                attrs.put("serialNumber", serialF.getText().trim());
+                attrs.put("miles", milesF.getText().trim().isBlank() ? 0 : Integer.parseInt(milesF.getText().trim()));
+                attrs.put("manufacturingDate", mfgDateF.getText().trim());
+                attrs.put("brand", brandF.getText().trim());
+                attrs.put("vin", vinF.getText().trim());
+                attrs.put("accidentHistory", accidentBox.isSelected());
 
-                return switch (typeBox.getValue()) {
-                    case "Art"         -> new Art(id, name, desc, sp, step, now, end, sid,
-                            artistF.getText().trim(), styleF.getText().trim(), artOriginF.getText().trim());
-                    case "Electronics" -> new Electronics(id, name, desc, sp, step, now, end, sid,
-                            Integer.parseInt(wattageF.getText().trim()), elecOriginF.getText().trim(),
-                            Integer.parseInt(warrantyF.getText().trim()), serialF.getText().trim());
-                    case "Vehicle"     -> new Vehicle(id, name, desc, sp, step, now, end, sid,
-                            Integer.parseInt(milesF.getText().trim()),
-                            LocalDate.parse(mfgDateF.getText().trim()),
-                            brandF.getText().trim(), vinF.getText().trim(), accidentBox.isSelected());
-                    default            -> new Other(id, name, desc, sp, step, now, end, sid);
-                };
+                Item item = ItemFactory.defaultFactory().create(typeBox.getValue(), id, name, desc, sp, step, start, end, sid, attrs);
+                if (editing) {
+                    item.setStatus(existing.getStatus());
+                    item.setCurrentWinnerId(existing.getCurrentWinnerId());
+                    item.setVersion(existing.getVersion());
+                }
+                return item;
             } catch (Exception ex) {
                 return null;
             }
         });
 
         return dlg;
+    }
+
+    private int durationMinutes(Item item) {
+        if (item.getBidStartTime() == null || item.getBidEndTime() == null) return 60;
+        return Math.max(1, (int) java.time.Duration.between(item.getBidStartTime(), item.getBidEndTime()).toMinutes());
     }
 
     private TextField field(String prompt) {

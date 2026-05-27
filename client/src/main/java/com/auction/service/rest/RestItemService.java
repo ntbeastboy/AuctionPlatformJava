@@ -32,6 +32,36 @@ public class RestItemService extends ItemService {
         if (!(user instanceof Seller))
             throw new UnauthorizedActionException("Only sellers can create items.");
 
+        try {
+            http.post("/items", http.getGson().toJson(itemToBody(item)));
+        } catch (IOException e) {
+            throw new RuntimeException(e.getMessage());
+        }
+    }
+
+    @Override
+    public void updateItem(User user, Item item) {
+        if (!(user instanceof Seller) && !(user instanceof Admin))
+            throw new UnauthorizedActionException("Only sellers or admins can update items.");
+        try {
+            http.put("/items/" + encode(item.getId()), http.getGson().toJson(itemToBody(item)));
+        } catch (IOException e) {
+            throw new RuntimeException(e.getMessage());
+        }
+    }
+
+    @Override
+    public void deleteItem(User user, String itemId) {
+        if (!(user instanceof Seller) && !(user instanceof Admin))
+            throw new UnauthorizedActionException("Only sellers or admins can delete items.");
+        try {
+            http.delete("/items/" + encode(itemId));
+        } catch (IOException e) {
+            throw new RuntimeException(e.getMessage());
+        }
+    }
+
+    private Map<String, Object> itemToBody(Item item) {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("name", item.getName());
         body.put("description", item.getDescription());
@@ -71,21 +101,10 @@ public class RestItemService extends ItemService {
             body.put("type", "Other");
         }
 
-        try {
-            http.post("/items", http.getGson().toJson(body));
-        } catch (IOException e) {
-            throw new RuntimeException(e.getMessage());
-        }
+        return body;
     }
 
-    @Override
-    public void deleteItem(User user, String itemId) {
-        if (!(user instanceof Admin))
-            throw new UnauthorizedActionException("Only admins can delete items.");
-        try {
-            http.delete("/items/" + itemId);
-        } catch (IOException e) {
-            throw new RuntimeException(e.getMessage());
-        }
+    private String encode(String value) {
+        return java.net.URLEncoder.encode(value, java.nio.charset.StandardCharsets.UTF_8);
     }
 }

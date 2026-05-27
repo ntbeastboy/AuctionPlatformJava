@@ -60,6 +60,7 @@ public class AuctionServer {
         app.get("/api/items/{id}", item::handleGetItem);
         app.put("/api/items/{id}/price", item::handleUpdateItemPrice);
         app.put("/api/items/{id}/close", item::handleCloseItem);
+        app.put("/api/items/{id}", item::handleUpdateItem);
         app.delete("/api/items/{id}", item::handleDeleteItem);
 
         // ── Bids (static paths before {id}) ──

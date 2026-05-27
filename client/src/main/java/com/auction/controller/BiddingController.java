@@ -305,9 +305,6 @@ public class BiddingController {
     }
 
     private String typeName(Item item) {
-        if (item instanceof Art)         return "Art";
-        if (item instanceof Electronics) return "Electronics";
-        if (item instanceof Vehicle)     return "Vehicle";
-        return "Item";
+        return item.getTypeName();
     }
 }

@@ -39,4 +39,7 @@ public class Vehicle extends Item {
     public boolean hasAccidentHistory() { return accidentHistory; }
 
     public void setAccidentHistory(boolean accidentHistory) { this.accidentHistory = accidentHistory; }
+
+    @Override
+    public String getTypeName() { return "Vehicle"; }
 }

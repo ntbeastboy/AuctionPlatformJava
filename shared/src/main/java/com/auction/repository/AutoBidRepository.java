@@ -11,4 +11,15 @@ public interface AutoBidRepository {
     List<AutoBid> findByItemId(String itemId);
     List<AutoBid> findByUserId(String userId);
     void delete(String userId, String itemId);
+
+    default void recordBid(String userId, String itemId, long bidAt) {
+        findByUserAndItem(userId, itemId).ifPresent(autoBid -> save(new AutoBid(
+                autoBid.getUserId(),
+                autoBid.getItemId(),
+                autoBid.getMaxBid(),
+                autoBid.getIncrement(),
+                autoBid.getCreatedAt(),
+                bidAt
+        )));
+    }
 }

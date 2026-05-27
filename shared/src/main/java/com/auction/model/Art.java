@@ -26,4 +26,7 @@ public class Art extends Item {
     public String getOrigin() { return origin; }
 
     public void setOrigin(String origin) { this.origin = origin; }
+
+    @Override
+    public String getTypeName() { return "Art"; }
 }

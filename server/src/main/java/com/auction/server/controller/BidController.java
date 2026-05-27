@@ -133,6 +133,7 @@ public class BidController {
         map.put("maxBid", autoBid.getMaxBid());
         map.put("increment", autoBid.getIncrement());
         map.put("createdAt", autoBid.getCreatedAt());
+        map.put("lastBidAt", autoBid.getLastBidAt());
         return map;
     }
 

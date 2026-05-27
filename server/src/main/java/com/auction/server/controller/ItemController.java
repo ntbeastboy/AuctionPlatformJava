@@ -22,6 +22,7 @@ public class ItemController {
     private final ItemService itemService;
     private final AuctionService auctionService;
     private final ItemEventBroadcaster eventBroadcaster;
+    private final ItemFactory itemFactory = ItemFactory.defaultFactory();
 
     public ItemController(ItemRepository itemRepo, UserRepository userRepo,
                           ItemService itemService, AuctionService auctionService) {
@@ -93,30 +94,37 @@ public class ItemController {
         LocalDateTime start = LocalDateTime.now();
         LocalDateTime end = start.plusMinutes(durationMinutes);
 
-        Item item = switch (type) {
-            case "Art" -> new Art(id, name, description, startPrice, priceStep, start, end, sellerId,
-                    (String) body.get("artist"), (String) body.get("paintingStyle"), (String) body.get("origin"));
-            case "Electronics" -> new Electronics(id, name, description, startPrice, priceStep, start, end, sellerId,
-                    ((Number) body.getOrDefault("wattage", 0)).intValue(),
-                    (String) body.get("origin"),
-                    ((Number) body.getOrDefault("warrantyMonths", 0)).intValue(),
-                    (String) body.get("serialNumber"));
-            case "Vehicle" -> {
-                String mfgStr = (String) body.get("manufacturingDate");
-                LocalDate mfgDate = mfgStr != null ? LocalDate.parse(mfgStr) : null;
-                yield new Vehicle(id, name, description, startPrice, priceStep, start, end, sellerId,
-                        ((Number) body.getOrDefault("miles", 0)).intValue(),
-                        mfgDate,
-                        (String) body.get("brand"),
-                        (String) body.get("vin"),
-                        Boolean.TRUE.equals(body.get("accidentHistory")));
-            }
-            default -> new Other(id, name, description, startPrice, priceStep, start, end, sellerId);
-        };
+        Item item = itemFactory.create(type, id, name, description, startPrice, priceStep, start, end, sellerId, body);
 
         itemService.createItem(seller, item);
         broadcastItemsChanged();
         ctx.status(201).json(itemToMap(item));
+    }
+
+    @SuppressWarnings("unchecked")
+    public void handleUpdateItem(Context ctx) {
+        String id = ctx.pathParam("id");
+        Item existing = itemRepo.findById(id)
+                .orElseThrow(() -> new ProductNotFoundException("Item not found: " + id));
+        String userId = ctx.attribute("userId");
+        User user = userRepo.findById(userId)
+                .orElseThrow(() -> new UserNotFoundException("User not found: " + userId));
+
+        Map<String, Object> body = ctx.bodyAsClass(Map.class);
+        String name = (String) body.getOrDefault("name", existing.getName());
+        String description = (String) body.getOrDefault("description", existing.getDescription());
+        double startPrice = number(body, "startPrice", existing.getStartingPrice()).doubleValue();
+        double priceStep = number(body, "priceStep", existing.getPriceStep()).doubleValue();
+        int durationMinutes = number(body, "durationMinutes", durationMinutes(existing)).intValue();
+        String type = (String) body.getOrDefault("type", itemType(existing));
+        LocalDateTime start = existing.getBidStartTime() != null ? existing.getBidStartTime() : LocalDateTime.now();
+        LocalDateTime end = start.plusMinutes(durationMinutes);
+
+        Item updated = itemFactory.create(type, id, name, description, startPrice, priceStep,
+                start, end, existing.getSellerId(), body);
+        itemService.updateItem(user, updated);
+        broadcastItemUpdated(id);
+        ctx.json(itemToMap(updated));
     }
 
     public void handleUpdateItemPrice(Context ctx) {
@@ -144,10 +152,6 @@ public class ItemController {
     }
 
     public void handleDeleteItem(Context ctx) {
-        String role = ctx.attribute("role");
-        if (!"ADMIN".equals(role))
-            throw new UnauthorizedActionException("Only admins can delete items.");
-
         String id = ctx.pathParam("id");
         String userId = ctx.attribute("userId");
         User user = userRepo.findById(userId)
@@ -201,10 +205,17 @@ public class ItemController {
     }
 
     private String itemType(Item item) {
-        if (item instanceof Art) return "Art";
-        if (item instanceof Electronics) return "Electronics";
-        if (item instanceof Vehicle) return "Vehicle";
-        return "Other";
+        return item.getTypeName();
+    }
+
+    private Number number(Map<String, Object> body, String key, Number fallback) {
+        Object value = body.get(key);
+        return value instanceof Number n ? n : fallback;
+    }
+
+    private int durationMinutes(Item item) {
+        if (item.getBidStartTime() == null || item.getBidEndTime() == null) return 60;
+        return Math.max(1, (int) java.time.Duration.between(item.getBidStartTime(), item.getBidEndTime()).toMinutes());
     }
 
     private void broadcastItemUpdated(String itemId) {

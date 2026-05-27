@@ -23,7 +23,7 @@ public class ServerMain {
         }
 
         // Database
-        DatabaseManager db = new DatabaseManager("auction_data.db");
+        DatabaseManager db = DatabaseManager.getInstance("auction_data.db");
 
         // Repositories
         UserRepository userRepo = new SqliteUserRepository(db);
@@ -39,12 +39,13 @@ public class ServerMain {
         AuctionService auctionService = new AuctionService(itemRepo, userRepo, tx);
         ItemEventBroadcaster eventBroadcaster = new ItemEventBroadcaster();
         auctionService.setStatusChangeCallback(eventBroadcaster::broadcastItemsChanged);
+        bidService.setItemUpdateCallback(eventBroadcaster::broadcastItemUpdated);
 
         // Recover any RUNNING auctions left over from a previous server run:
         // close those whose end-time has passed, reschedule the rest.
         auctionService.recoverScheduledAuctions();
 
-        // Seed admin account with hashed password (recreate DB if upgrading from plaintext)
+        // Seed admin account if missing.
         if (!userRepo.existsByUsername("admin")) {
             userRepo.save(new Admin("admin-0", "admin", PasswordUtil.hash("admin")));
         }
@@ -63,6 +64,7 @@ public class ServerMain {
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             System.out.println("Shutting down server...");
             auctionService.shutdown();
+            bidService.shutdown();
             server.stop();
             db.close();
         }));

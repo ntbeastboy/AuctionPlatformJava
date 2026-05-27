@@ -34,12 +34,11 @@
 
     <!-- Action bar -->
     <HBox spacing="8" alignment="CENTER_LEFT">
-        <Button text="Refresh" onAction="#onRefresh" styleClass="btn-secondary"/>
-        <Region prefWidth="20"/>
-
         <!-- Seller -->
         <Button fx:id="createItemBtn" text="Create Item" onAction="#onCreateItem"
                 styleClass="btn-primary" managed="false" visible="false"/>
+        <Button fx:id="editItemBtn" text="Edit Item" onAction="#onEditItem"
+                styleClass="btn-secondary" managed="false" visible="false"/>
 
         <!-- Admin -->
         <Button fx:id="startBtn"    text="Start"     onAction="#onStart"       styleClass="btn-primary"   managed="false" visible="false"/>

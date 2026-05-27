@@ -7,4 +7,7 @@ public class Other extends Item {
                  LocalDateTime bidStartTime, LocalDateTime bidEndTime, String sellerId) {
         super(id, name, description, startingPrice, priceStep, bidStartTime, bidEndTime, sellerId);
     }
+
+    @Override
+    public String getTypeName() { return "Other"; }
 }

@@ -114,6 +114,10 @@ public class AuctionService {
      * the work commits atomically with the status flip.
      */
     public void closeAuction(String itemId) {
+        closeAuction(itemId, false);
+    }
+
+    private void closeAuction(String itemId, boolean force) {
         ReentrantLock lock = ItemLockManager.getLock(itemId);
         lock.lock();
         try {
@@ -121,6 +125,13 @@ public class AuctionService {
 
             if (item.getStatus() != AuctionStatus.RUNNING)
                 return;
+
+            LocalDateTime now = LocalDateTime.now();
+            if (!force && item.getBidEndTime() != null && now.isBefore(item.getBidEndTime())) {
+                long delayMs = Duration.between(now, item.getBidEndTime()).toMillis();
+                scheduler.schedule(() -> closeAuction(itemId), delayMs, TimeUnit.MILLISECONDS);
+                return;
+            }
 
             String winnerId = item.getCurrentWinnerId();
             if (winnerId == null) {
@@ -152,10 +163,11 @@ public class AuctionService {
                 return;
             }
 
+            item.setStatus(AuctionStatus.FINISHED);
             if (winnerUser instanceof Bidder b) b.deductFunds(price);
             else ((Seller) winnerUser).withdraw(price);
             seller.addFunds(price);
-            item.setStatus(AuctionStatus.FINISHED);
+            item.setStatus(AuctionStatus.PAID);
 
             // Atomic: status flip + winner debit + seller credit commit together.
             final User w = winnerUser;
@@ -173,7 +185,7 @@ public class AuctionService {
     public void endAuctionEarly(String itemId, User requestingUser) {
         if (!(requestingUser instanceof Admin))
             throw new UnauthorizedActionException("Only admins can end auctions early.");
-        closeAuction(itemId);
+        closeAuction(itemId, true);
     }
 
     public void cancelAuction(String itemId, User requestingUser) {
@@ -186,8 +198,8 @@ public class AuctionService {
             Item item = getItem(itemId);
             AuctionStatus current = item.getStatus();
 
-            if (current == AuctionStatus.FINISHED)
-                throw new IllegalStateException("Cannot cancel a FINISHED auction.");
+            if (current == AuctionStatus.FINISHED || current == AuctionStatus.PAID)
+                throw new IllegalStateException("Cannot cancel a settled auction.");
             if (current == AuctionStatus.CANCELED)
                 throw new IllegalStateException("Auction is already CANCELED.");
 

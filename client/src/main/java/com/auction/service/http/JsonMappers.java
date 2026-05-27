@@ -2,7 +2,6 @@ package com.auction.service.http;
 
 import com.auction.model.*;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -74,21 +73,8 @@ public final class JsonMappers {
         LocalDateTime bidStart = parseDateTime(str(map, "bidStartTime"));
         LocalDateTime bidEnd = parseDateTime(str(map, "bidEndTime"));
 
-        Item item;
-        switch (type == null ? "Other" : type) {
-            case "Art" -> item = new Art(id, name, description, startPrice, priceStep, bidStart, bidEnd, sellerId,
-                    str(map, "artist"), str(map, "paintingStyle"), str(map, "origin"));
-            case "Electronics" -> item = new Electronics(id, name, description, startPrice, priceStep, bidStart, bidEnd, sellerId,
-                    (int) num(map, "wattage"), str(map, "origin"),
-                    (int) num(map, "warrantyMonths"), str(map, "serialNumber"));
-            case "Vehicle" -> {
-                LocalDate mfg = parseDate(str(map, "manufacturingDate"));
-                item = new Vehicle(id, name, description, startPrice, priceStep, bidStart, bidEnd, sellerId,
-                        (int) num(map, "miles"), mfg, str(map, "brand"), str(map, "vin"),
-                        Boolean.TRUE.equals(map.get("accidentHistory")));
-            }
-            default -> item = new Other(id, name, description, startPrice, priceStep, bidStart, bidEnd, sellerId);
-        }
+        Item item = ItemFactory.defaultFactory().create(type, id, name, description, startPrice, priceStep,
+                bidStart, bidEnd, sellerId, map);
 
         item.setCurrentPrice(currentPrice);
         item.setCurrentWinnerId(winnerId);
@@ -116,7 +102,8 @@ public final class JsonMappers {
                 str(map, "itemId"),
                 num(map, "maxBid"),
                 num(map, "increment"),
-                Math.round(num(map, "createdAt"))
+                Math.round(num(map, "createdAt")),
+                Math.round(num(map, "lastBidAt"))
         );
     }
 
@@ -145,9 +132,4 @@ public final class JsonMappers {
         catch (Exception e) { return null; }
     }
 
-    private static LocalDate parseDate(String s) {
-        if (s == null || s.isBlank()) return null;
-        try { return LocalDate.parse(s); }
-        catch (Exception e) { return null; }
-    }
 }

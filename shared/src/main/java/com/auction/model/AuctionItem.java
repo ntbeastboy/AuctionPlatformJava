@@ -29,4 +29,7 @@ public class AuctionItem extends Item {
     public void setCondition(String condition) {
         this.condition = condition;
     }
+
+    @Override
+    public String getTypeName() { return "AuctionItem"; }
 }
