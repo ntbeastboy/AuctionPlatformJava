@@ -429,8 +429,30 @@ public class AuctionListController {
                                       TextField priceStepF, TextField durationMinsF,
                                       TextField wattageF, TextField warrantyF,
                                       TextField milesF, TextField mfgDateF) {
+        String startPriceStr = startPriceF.getText().trim();
+        String priceStepStr = priceStepF.getText().trim();
         if (nameF.getText().trim().isEmpty())
             return "Name is required.";
+        if (startPriceF.getText().trim().isEmpty())
+            return "Starting price cannot be empty.";
+        if (priceStepF.getText().trim().isEmpty())
+            return "Price step cannot be empty.";
+        if (!startPriceStr.matches("\\d+(\\.\\d+)?"))
+            return "Starting price must be a plain number (e.g. 100 or 99.99)";
+        if (!priceStepStr.matches("\\d+(\\.\\d+)?"))
+            return "Price step must be a plain number (e.g. 100 or 99.99)";
+        try {
+            double startPrice = Double.parseDouble(startPriceStr);
+            if (startPrice <= 0) return "Start price must be positive.";
+        } catch (NumberFormatException e) {
+            return "Starting price is not a valid number.";
+        }
+        try {
+            double priceStep = Double.parseDouble(priceStepStr);
+            if (priceStep <= 0) return "Price step must be positive.";
+        } catch (NumberFormatException e) {
+            return "Price step is not a valid number.";
+        }
         try { Double.parseDouble(startPriceF.getText().trim()); }
         catch (NumberFormatException e) { return "Starting price must be a number."; }
         try { Double.parseDouble(priceStepF.getText().trim()); }
