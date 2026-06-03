@@ -144,7 +144,8 @@ public class UserController {
         if (itemRepo == null) return 0.0;
         Map<String, Double> commitmentsByItem = new HashMap<>();
         for (Item item : itemRepo.findAll()) {
-            if (item.getStatus() == AuctionStatus.RUNNING && userId.equals(item.getCurrentWinnerId())) {
+            if ((item.getStatus() == AuctionStatus.RUNNING || item.getStatus() == AuctionStatus.FINISHED)
+                    && userId.equals(item.getCurrentWinnerId())) {
                 commitmentsByItem.merge(item.getId(), item.getCurrentPrice(), Math::max);
             }
         }

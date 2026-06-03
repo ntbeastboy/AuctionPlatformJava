@@ -50,6 +50,14 @@ public class AuctionController {
         ctx.json(Map.of("message", "Auction canceled."));
     }
 
+    public void handlePaySeller(Context ctx) {
+        String itemId = ctx.pathParam("id");
+        User user = getAuthenticatedUser(ctx);
+        auctionService.paySeller(itemId, user);
+        broadcastItemUpdated(itemId);
+        ctx.json(Map.of("message", "Seller paid."));
+    }
+
     private User getAuthenticatedUser(Context ctx) {
         String userId = ctx.attribute("userId");
         return userRepo.findById(userId)

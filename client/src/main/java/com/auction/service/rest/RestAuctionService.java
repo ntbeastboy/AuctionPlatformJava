@@ -43,6 +43,11 @@ public class RestAuctionService extends AuctionService {
     }
 
     @Override
+    public void paySeller(String itemId, User requestingUser) {
+        post("/auction/" + itemId + "/pay");
+    }
+
+    @Override
     public void recoverScheduledAuctions() {
         // Server handles this on its own startup.
     }

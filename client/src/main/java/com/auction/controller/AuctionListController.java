@@ -51,6 +51,7 @@ public class AuctionListController {
     @FXML private Button cancelBtn;
     @FXML private Button deleteBtn;
     @FXML private Button placeBidBtn;
+    @FXML private Button paySellerBtn;
     @FXML private Label statusLabel;
 
     private AppState appState;
@@ -87,6 +88,7 @@ public class AuctionListController {
             });
             return row;
         });
+        itemTable.getSelectionModel().selectedItemProperty().addListener((obs, oldItem, newItem) -> updatePaySellerButton());
         colType.setCellValueFactory(c -> new SimpleStringProperty(typeName(c.getValue())));
         colStatus.setCellValueFactory(new PropertyValueFactory<>("status"));
         colPrice.setCellValueFactory(c ->
@@ -119,6 +121,7 @@ public class AuctionListController {
         } else if (appState.currentUser instanceof Bidder) {
             show(addFundsBtn, withdrawBtn, placeBidBtn);
         }
+        updatePaySellerButton();
     }
 
     private void show(javafx.scene.Node... nodes) {
@@ -161,7 +164,7 @@ public class AuctionListController {
     @FXML
     private void onWithdraw() {
         double committed = appState.itemRepository.findAll().stream()
-                .filter(i -> i.getStatus() == AuctionStatus.RUNNING
+                .filter(i -> (i.getStatus() == AuctionStatus.RUNNING || i.getStatus() == AuctionStatus.FINISHED)
                           && appState.currentUser.getId().equals(i.getCurrentWinnerId()))
                 .mapToDouble(Item::getCurrentPrice)
                 .sum();
@@ -236,6 +239,28 @@ public class AuctionListController {
         switchToBidding(selected);
     }
 
+    @FXML
+    private void onPaySeller() {
+        Item selected = itemTable.getSelectionModel().getSelectedItem();
+        if (selected == null) { showStatus("Select an item first.", true); return; }
+        if (selected.getStatus() != AuctionStatus.FINISHED) {
+            showStatus("Auction must be FINISHED before payment.", true);
+            return;
+        }
+        if (!appState.currentUser.getId().equals(selected.getCurrentWinnerId())) {
+            showStatus("Only the winning bidder can pay the seller.", true);
+            return;
+        }
+        try {
+            appState.auctionService.paySeller(selected.getId(), appState.currentUser);
+            refreshCurrentUser();
+            refreshTable();
+            showStatus("Seller paid.", false);
+        } catch (Exception e) {
+            showStatus(e.getMessage(), true);
+        }
+    }
+
     private void switchToBidding(Item item) {
         try {
             FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/bidding.fxml"));
@@ -261,6 +286,17 @@ public class AuctionListController {
         itemTable.setItems(FXCollections.observableArrayList(appState.itemRepository.findAll()));
         itemTable.refresh();
         refreshUserInfo();
+        updatePaySellerButton();
+    }
+
+    private void updatePaySellerButton() {
+        if (paySellerBtn == null || appState == null || appState.currentUser == null) return;
+        Item selected = itemTable.getSelectionModel().getSelectedItem();
+        boolean canPay = selected != null
+                && selected.getStatus() == AuctionStatus.FINISHED
+                && appState.currentUser.getId().equals(selected.getCurrentWinnerId());
+        paySellerBtn.setVisible(canPay);
+        paySellerBtn.setManaged(canPay);
     }
 
     private void registerRealtimeUpdates() {

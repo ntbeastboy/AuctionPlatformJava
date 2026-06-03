@@ -78,6 +78,7 @@ public class AuctionServer {
         app.post("/api/auction/{id}/start", auction::handleStartAuction);
         app.post("/api/auction/{id}/end", auction::handleEndAuction);
         app.post("/api/auction/{id}/cancel", auction::handleCancelAuction);
+        app.post("/api/auction/{id}/pay", auction::handlePaySeller);
     }
 
     private ObjectMapper createObjectMapper() {

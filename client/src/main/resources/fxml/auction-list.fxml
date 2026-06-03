@@ -48,6 +48,7 @@
 
         <!-- Bidder / Seller -->
         <Button fx:id="placeBidBtn"    text="Place Bid"       onAction="#onPlaceBid"      styleClass="btn-primary"   managed="false" visible="false"/>
+        <Button fx:id="paySellerBtn"   text="Pay Seller"      onAction="#onPaySeller"     styleClass="btn-primary"   managed="false" visible="false"/>
     </HBox>
 
     <Label fx:id="statusLabel" styleClass="error-label"/>
