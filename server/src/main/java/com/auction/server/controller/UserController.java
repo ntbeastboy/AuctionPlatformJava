@@ -187,6 +187,8 @@ public class UserController {
             if (!userId.equals(item.getCurrentWinnerId())) continue;
             if (item.getStatus() != AuctionStatus.RUNNING && item.getStatus() != AuctionStatus.FINISHED) continue;
 
+            bidRepo.deleteLatestByBidderAndItem(userId, item.getId());
+
             Bid previousWinner = previousValidBid(item.getId(), userId);
             if (previousWinner == null) {
                 item.setCurrentWinnerId(null);

@@ -41,6 +41,7 @@ public class ServerMain {
         ItemEventBroadcaster eventBroadcaster = new ItemEventBroadcaster();
         UserBanExpiryScheduler banExpiryScheduler = new UserBanExpiryScheduler(userRepo, eventBroadcaster);
         auctionService.setStatusChangeCallback(eventBroadcaster::broadcastItemsChanged);
+        auctionService.setItemStatusChangeCallback(eventBroadcaster::broadcastItemUpdated);
         bidService.setItemUpdateCallback(eventBroadcaster::broadcastItemUpdated);
 
         // Recover any RUNNING auctions left over from a previous server run:

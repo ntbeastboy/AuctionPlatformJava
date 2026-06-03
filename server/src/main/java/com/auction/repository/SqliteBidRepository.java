@@ -54,6 +54,21 @@ public class SqliteBidRepository implements BidRepository {
         return query(sql, bidderId);
     }
 
+    @Override
+    public void deleteLatestByBidderAndItem(String bidderId, String itemId) {
+        String sql = "DELETE FROM bids WHERE rowid IN (" +
+                "SELECT rowid FROM bids WHERE bidder_id = ? AND item_id = ? " +
+                "ORDER BY timestamp DESC, rowid DESC LIMIT 1" +
+                ")";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, bidderId);
+            ps.setString(2, itemId);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to delete latest bid: " + e.getMessage(), e);
+        }
+    }
+
     private List<Bid> query(String sql, String param) {
         List<Bid> result = new ArrayList<>();
         try (PreparedStatement ps = conn.prepareStatement(sql)) {

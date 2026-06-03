@@ -86,5 +86,15 @@ class BidServiceAntiSnipingTest {
         @Override public List<Bid> findByBidderId(String bidderId) {
             return bids.stream().filter(b -> bidderId.equals(b.getBidderId())).toList();
         }
+
+        @Override public void deleteLatestByBidderAndItem(String bidderId, String itemId) {
+            for (int i = bids.size() - 1; i >= 0; i--) {
+                Bid bid = bids.get(i);
+                if (bidderId.equals(bid.getBidderId()) && itemId.equals(bid.getItemId())) {
+                    bids.remove(i);
+                    return;
+                }
+            }
+        }
     }
 }

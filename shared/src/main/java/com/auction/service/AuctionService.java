@@ -20,6 +20,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.Consumer;
 
 public class AuctionService {
 
@@ -31,9 +32,14 @@ public class AuctionService {
     private final TransactionRunner txRunner;
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(4);
     private Runnable statusChangeCallback;
+    private Consumer<String> itemStatusChangeCallback;
 
     public void setStatusChangeCallback(Runnable callback) {
         this.statusChangeCallback = callback;
+    }
+
+    public void setItemStatusChangeCallback(Consumer<String> callback) {
+        this.itemStatusChangeCallback = callback;
     }
 
     public AuctionService(ItemRepository itemRepository, UserRepository userRepository,
@@ -104,6 +110,7 @@ public class AuctionService {
                 closeAuction(itemId);
             } else {
                 scheduleClose(itemId, Duration.ofMillis(delayMs));
+                notifyStatusChange(itemId);
             }
         } finally {
             lock.unlock();
@@ -141,7 +148,7 @@ public class AuctionService {
             if (winnerId == null) {
                 item.setStatus(AuctionStatus.CANCELED);
                 runInTx(() -> itemRepository.update(item));
-                if (statusChangeCallback != null) statusChangeCallback.run();
+                notifyStatusChange(itemId);
                 return;
             }
 
@@ -153,7 +160,7 @@ public class AuctionService {
             item.setStatus(AuctionStatus.FINISHED);
             runInTx(() -> itemRepository.update(item));
             schedulePaymentExpiry(item.getId(), paymentDeadline(item));
-            if (statusChangeCallback != null) statusChangeCallback.run();
+            notifyStatusChange(itemId);
         } finally {
             lock.unlock();
         }
@@ -208,7 +215,7 @@ public class AuctionService {
                 userRepository.save(w);
                 userRepository.save(sellerUser);
             });
-            if (statusChangeCallback != null) statusChangeCallback.run();
+            notifyStatusChange(itemId);
         } finally {
             lock.unlock();
         }
@@ -237,6 +244,7 @@ public class AuctionService {
 
             item.setStatus(AuctionStatus.CANCELED);
             runInTx(() -> itemRepository.update(item));
+            notifyStatusChange(itemId);
         } finally {
             lock.unlock();
         }
@@ -299,9 +307,16 @@ public class AuctionService {
                 itemRepository.update(item);
                 if (bannedWinner != null) userRepository.save(bannedWinner);
             });
-            if (statusChangeCallback != null) statusChangeCallback.run();
+            notifyStatusChange(itemId);
         } finally {
             lock.unlock();
+        }
+    }
+
+    private void notifyStatusChange(String itemId) {
+        if (statusChangeCallback != null) statusChangeCallback.run();
+        if (itemStatusChangeCallback != null && itemId != null && !itemId.isBlank()) {
+            itemStatusChangeCallback.accept(itemId);
         }
     }
 }

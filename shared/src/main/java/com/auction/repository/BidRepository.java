@@ -10,4 +10,5 @@ public interface BidRepository {
     Optional<Bid> findById(int id);
     List<Bid> findByItemId(String itemId);
     List<Bid> findByBidderId(String bidderId);
+    void deleteLatestByBidderAndItem(String bidderId, String itemId);
 }

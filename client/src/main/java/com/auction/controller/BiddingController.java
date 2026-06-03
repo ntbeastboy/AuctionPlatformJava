@@ -259,11 +259,7 @@ public class BiddingController {
 
     private void registerRealtimeUpdates() {
         removeRealtimeUpdates();
-        updateListener = message -> {
-            if (shouldRefreshForEvent(message)) {
-                Platform.runLater(this::refreshFromServer);
-            }
-        };
+        updateListener = message -> Platform.runLater(() -> handleRealtimeUpdate(message));
         appState.httpClient.addUpdateListener(updateListener);
     }
 
@@ -274,16 +270,59 @@ public class BiddingController {
         }
     }
 
-    private boolean shouldRefreshForEvent(String message) {
+    private void handleRealtimeUpdate(String message) {
+        String type = null;
+        String userId = null;
+        String itemId = null;
         try {
             @SuppressWarnings("unchecked")
             Map<String, Object> event = appState.httpClient.getGson().fromJson(message, Map.class);
-            Object type = event.get("type");
-            Object itemId = event.get("itemId");
-            return "ITEMS_CHANGED".equals(type) || item.getId().equals(String.valueOf(itemId));
+            Object typeObj = event.get("type");
+            Object userIdObj = event.get("userId");
+            Object itemIdObj = event.get("itemId");
+            if (typeObj != null) type = String.valueOf(typeObj);
+            if (userIdObj != null) userId = String.valueOf(userIdObj);
+            if (itemIdObj != null) itemId = String.valueOf(itemIdObj);
         } catch (Exception e) {
-            return true;
+            refreshFromServer();
+            return;
         }
+
+        if ("USER_BANNED".equals(type)) {
+            refreshFromServer();
+            if (isCurrentUser(userId)) {
+                forceLogout("Your account was banned by an administrator.");
+            }
+            return;
+        }
+
+        if ("USER_DELETED".equals(type)) {
+            refreshFromServer();
+            if (isCurrentUser(userId)) {
+                forceLogout("Your account was deleted by an administrator.");
+            }
+            return;
+        }
+
+        if ("USER_UPDATED".equals(type) || "USERS_CHANGED".equals(type)) {
+            refreshFromServer();
+            refreshCurrentUserAndLogoutIfUnavailable();
+            return;
+        }
+
+        if ("ITEM_UPDATED".equals(type)) {
+            if (itemId != null && item.getId().equals(itemId)) {
+                refreshFromServer();
+            }
+            return;
+        }
+
+        if ("ITEMS_CHANGED".equals(type)) {
+            refreshFromServer();
+            return;
+        }
+
+        refreshFromServer();
     }
 
     private void refreshFromServer() {
@@ -301,12 +340,58 @@ public class BiddingController {
         }
     }
 
+    private void refreshCurrentUserAndLogoutIfUnavailable() {
+        if (appState.currentUser == null) return;
+        try {
+            User fresh = appState.restUserService.refresh(appState.currentUser.getId());
+            if (fresh == null) {
+                forceLogout("Your account is no longer available.");
+                return;
+            }
+            appState.currentUser = fresh;
+            if (fresh instanceof BannableUser bu && bu.isBanned()) {
+                forceLogout("Your account was banned by an administrator.");
+            }
+        } catch (Exception e) {
+            forceLogout("Your account is no longer available.");
+        }
+    }
+
+    private boolean isCurrentUser(String userId) {
+        return userId != null && appState.currentUser != null && userId.equals(appState.currentUser.getId());
+    }
+
+    private void forceLogout(String message) {
+        try {
+            removeRealtimeUpdates();
+            appState.auctionService.setStatusChangeCallback(null);
+            appState.restUserService.logout();
+            appState.currentUser = null;
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/login.fxml"));
+            Scene scene = new Scene(loader.load(), 520, 440);
+            scene.getStylesheets().add(getClass().getResource("/css/style.css").toExternalForm());
+            LoginController controller = loader.getController();
+            controller.init(appState, stage);
+            stage.setScene(scene);
+            stage.setResizable(false);
+            stage.setTitle("Auction Platform");
+            if (message != null && !message.isBlank()) {
+                Alert alert = new Alert(Alert.AlertType.INFORMATION);
+                alert.setTitle("Logged out");
+                alert.setHeaderText(message);
+                alert.show();
+            }
+        } catch (IOException e) {
+            showStatus(e.getMessage(), true);
+        }
+    }
+
     private String typeName(Item item) {
         return item.getTypeName();
     }
 
     private String bidderDisplayName(Optional<User> user) {
-        if (user.isEmpty()) return "DELETED_USER";
+        if (user.isEmpty()) return "USER_DELETED";
         User bidder = user.orElseThrow();
         String username = bidder.getUsername();
         if (bidder instanceof BannableUser bu && bu.isBanned()) return username + "(BANNED)";
