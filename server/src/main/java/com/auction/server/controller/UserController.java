@@ -58,6 +58,7 @@ public class UserController {
     }
 
     public void handleGetAllUsers(Context ctx) {
+        requireAdmin(ctx);
         ctx.json(userRepo.findAll().stream().map(this::userToMap).toList());
     }
 
@@ -100,19 +101,31 @@ public class UserController {
     }
 
     public void handleBanUser(Context ctx) {
-        String role = ctx.attribute("role");
-        if (!"ADMIN".equals(role))
-            throw new UnauthorizedActionException("Only admins can ban users.");
         String id = ctx.pathParam("id");
-        User user = userRepo.findById(id)
-                .orElseThrow(() -> new UserNotFoundException("User not found: " + id));
-        if (user instanceof BannableUser bu) {
-            bu.banPermanent();
-            userRepo.save(user);
-            ctx.json(userToMap(user));
-        } else {
-            throw new IllegalStateException("This user type cannot be banned.");
-        }
+        User user = userService.banUser(id, getAuthenticatedUser(ctx));
+        ctx.json(userToMap(user));
+    }
+
+    public void handleChangeUsername(Context ctx) {
+        String id = ctx.pathParam("id");
+        @SuppressWarnings("unchecked")
+        Map<String, String> body = ctx.bodyAsClass(Map.class);
+        User user = userService.changeUsername(id, body.get("username"), getAuthenticatedUser(ctx));
+        ctx.json(userToMap(user));
+    }
+
+    public void handleChangePassword(Context ctx) {
+        String id = ctx.pathParam("id");
+        @SuppressWarnings("unchecked")
+        Map<String, String> body = ctx.bodyAsClass(Map.class);
+        User user = userService.changePassword(id, body.get("password"), getAuthenticatedUser(ctx));
+        ctx.json(userToMap(user));
+    }
+
+    public void handleDeleteUser(Context ctx) {
+        String id = ctx.pathParam("id");
+        userService.deleteAccount(id, getAuthenticatedUser(ctx));
+        ctx.json(Map.of("message", "User deleted."));
     }
 
     private Map<String, Object> userToMap(User user) {
@@ -138,6 +151,17 @@ public class UserController {
         if (!targetUserId.equals(requesterId) && !"ADMIN".equals(role)) {
             throw new UnauthorizedActionException("Only admins can " + action + ".");
         }
+    }
+
+    private void requireAdmin(Context ctx) {
+        if (!"ADMIN".equals(ctx.attribute("role")))
+            throw new UnauthorizedActionException("Only admins can manage users.");
+    }
+
+    private User getAuthenticatedUser(Context ctx) {
+        String userId = ctx.attribute("userId");
+        return userRepo.findById(userId)
+                .orElseThrow(() -> new UserNotFoundException("User not found: " + userId));
     }
 
     private double committedAmount(String userId) {

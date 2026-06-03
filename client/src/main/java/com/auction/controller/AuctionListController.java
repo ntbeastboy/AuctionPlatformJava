@@ -52,6 +52,14 @@ public class AuctionListController {
     @FXML private Button deleteBtn;
     @FXML private Button placeBidBtn;
     @FXML private Button paySellerBtn;
+    @FXML private TabPane mainTabs;
+    @FXML private Tab manageUsersTab;
+    @FXML private TableView<User> userTable;
+    @FXML private TableColumn<User, String> colUserId;
+    @FXML private TableColumn<User, String> colUsername;
+    @FXML private TableColumn<User, String> colUserRole;
+    @FXML private TableColumn<User, String> colUserBalance;
+    @FXML private TableColumn<User, String> colUserBanned;
     @FXML private Label statusLabel;
 
     private AppState appState;
@@ -62,8 +70,10 @@ public class AuctionListController {
         this.appState = appState;
         this.stage = stage;
         setupTable();
+        setupUserTable();
         configureRoleButtons();
         refreshTable();
+        refreshUsers();
         stage.setTitle("Auction Platform – " + appState.currentUser.getUsername());
 
         appState.auctionService.setStatusChangeCallback(() -> Platform.runLater(this::refreshTable));
@@ -118,10 +128,20 @@ public class AuctionListController {
             show(editItemBtn, startBtn, endEarlyBtn, cancelBtn, deleteBtn);
         } else if (appState.currentUser instanceof Seller) {
             show(addFundsBtn, withdrawBtn, createItemBtn, editItemBtn, deleteBtn, startBtn, placeBidBtn);
+            mainTabs.getTabs().remove(manageUsersTab);
         } else if (appState.currentUser instanceof Bidder) {
             show(addFundsBtn, withdrawBtn, placeBidBtn);
+            mainTabs.getTabs().remove(manageUsersTab);
         }
         updatePaySellerButton();
+    }
+
+    private void setupUserTable() {
+        colUserId.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getId()));
+        colUsername.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getUsername()));
+        colUserRole.setCellValueFactory(c -> new SimpleStringProperty(roleOf(c.getValue())));
+        colUserBalance.setCellValueFactory(c -> new SimpleStringProperty(balanceOf(c.getValue())));
+        colUserBanned.setCellValueFactory(c -> new SimpleStringProperty(bannedText(c.getValue())));
     }
 
     private void show(javafx.scene.Node... nodes) {
@@ -287,6 +307,122 @@ public class AuctionListController {
         itemTable.refresh();
         refreshUserInfo();
         updatePaySellerButton();
+    }
+
+    @FXML
+    private void onRefreshUsers() {
+        refreshUsers();
+        showStatus("User list refreshed.", false);
+    }
+
+    @FXML
+    private void onBanUser() {
+        withSelectedUser(user -> {
+            appState.restUserService.banUser(user.getId());
+            refreshUsers();
+            showStatus("User banned.", false);
+        });
+    }
+
+    @FXML
+    private void onChangeUsername() {
+        withSelectedUser(user -> {
+            TextInputDialog dlg = new TextInputDialog(user.getUsername());
+            dlg.setTitle("Change Username");
+            dlg.setHeaderText("Enter a new username:");
+            dlg.showAndWait().ifPresent(username -> {
+                try {
+                    User updated = appState.restUserService.changeUsername(user.getId(), username.trim());
+                    if (appState.currentUser.getId().equals(updated.getId())) {
+                        appState.currentUser = updated;
+                        refreshUserInfo();
+                    }
+                    refreshUsers();
+                    showStatus("Username updated.", false);
+                } catch (Exception e) {
+                    showStatus(e.getMessage(), true);
+                }
+            });
+        });
+    }
+
+    @FXML
+    private void onChangePassword() {
+        withSelectedUser(user -> {
+            Dialog<String> dlg = new Dialog<>();
+            dlg.setTitle("Change Password");
+            dlg.setHeaderText("Enter a new password:");
+            PasswordField passwordField = new PasswordField();
+            passwordField.setPromptText("New password");
+            dlg.getDialogPane().setContent(passwordField);
+            ButtonType saveBtn = new ButtonType("Save", ButtonBar.ButtonData.OK_DONE);
+            dlg.getDialogPane().getButtonTypes().addAll(saveBtn, ButtonType.CANCEL);
+            dlg.setResultConverter(btn -> btn == saveBtn ? passwordField.getText() : null);
+            dlg.showAndWait().ifPresent(password -> {
+                try {
+                    appState.restUserService.changePassword(user.getId(), password);
+                    refreshUsers();
+                    showStatus("Password updated.", false);
+                } catch (Exception e) {
+                    showStatus(e.getMessage(), true);
+                }
+            });
+        });
+    }
+
+    @FXML
+    private void onDeleteUser() {
+        withSelectedUser(user -> {
+            Alert confirm = new Alert(Alert.AlertType.CONFIRMATION);
+            confirm.setTitle("Delete Account");
+            confirm.setHeaderText("Delete account \"" + user.getUsername() + "\"?");
+            confirm.setContentText("This action cannot be undone.");
+            confirm.showAndWait()
+                    .filter(btn -> btn == ButtonType.OK)
+                    .ifPresent(btn -> {
+                        try {
+                            appState.restUserService.deleteUser(user.getId());
+                            refreshUsers();
+                            showStatus("User deleted.", false);
+                        } catch (Exception e) {
+                            showStatus(e.getMessage(), true);
+                        }
+                    });
+        });
+    }
+
+    private void refreshUsers() {
+        if (!(appState.currentUser instanceof Admin) || userTable == null) return;
+        try {
+            userTable.setItems(FXCollections.observableArrayList(appState.restUserService.findAllUsers()));
+            userTable.refresh();
+        } catch (Exception e) {
+            showStatus(e.getMessage(), true);
+        }
+    }
+
+    private void withSelectedUser(java.util.function.Consumer<User> action) {
+        User selected = userTable.getSelectionModel().getSelectedItem();
+        if (selected == null) { showStatus("Select a user first.", true); return; }
+        try { action.accept(selected); }
+        catch (Exception e) { showStatus(e.getMessage(), true); }
+    }
+
+    private String roleOf(User user) {
+        if (user instanceof Admin) return "ADMIN";
+        if (user instanceof Seller) return "SELLER";
+        return "BIDDER";
+    }
+
+    private String balanceOf(User user) {
+        if (user instanceof Bidder b) return "$" + String.format("%.2f", b.getBalance());
+        if (user instanceof Seller s) return "$" + String.format("%.2f", s.getBalance());
+        return "â€”";
+    }
+
+    private String bannedText(User user) {
+        if (user instanceof BannableUser bu) return bu.isBanned() ? "Yes" : "No";
+        return "N/A";
     }
 
     private void updatePaySellerButton() {

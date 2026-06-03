@@ -72,4 +72,10 @@ public class RestUserRepository implements UserRepository {
             return List.of();
         }
     }
+
+    @Override
+    public void delete(String id) {
+        throw new UnsupportedOperationException(
+                "RestUserRepository is read-only. Use UserService for admin account changes.");
+    }
 }

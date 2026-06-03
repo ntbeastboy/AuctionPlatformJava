@@ -50,6 +50,9 @@ public class AuctionServer {
         app.post("/api/users/{id}/balance/add", user::handleAddBalance);
         app.post("/api/users/{id}/balance/deduct", user::handleDeductBalance);
         app.post("/api/users/{id}/ban", user::handleBanUser);
+        app.put("/api/users/{id}/username", user::handleChangeUsername);
+        app.put("/api/users/{id}/password", user::handleChangePassword);
+        app.delete("/api/users/{id}", user::handleDeleteUser);
 
         // ── Items (static paths before {id}) ──
         app.get("/api/items", item::handleGetAllItems);

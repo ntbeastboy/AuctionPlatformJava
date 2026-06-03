@@ -11,6 +11,7 @@ import com.google.gson.reflect.TypeToken;
 
 import java.io.IOException;
 import java.lang.reflect.Type;
+import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -104,6 +105,59 @@ public class RestUserService extends UserService {
             return JsonMappers.toUser(map);
         } catch (IOException e) {
             throw new UserNotFoundException(extract(e));
+        }
+    }
+
+    public List<User> findAllUsers() {
+        try {
+            Type listType = new TypeToken<List<Map<String, Object>>>(){}.getType();
+            String response = http.get("/users");
+            List<Map<String, Object>> users = http.getGson().fromJson(response, listType);
+            return users.stream().map(JsonMappers::toUser).toList();
+        } catch (IOException e) {
+            throw new UnauthorizedActionException(extract(e));
+        }
+    }
+
+    public User banUser(String userId) {
+        try {
+            String response = http.post("/users/" + userId + "/ban", "{}");
+            Map<String, Object> map = http.getGson().fromJson(response, MAP);
+            return JsonMappers.toUser(map);
+        } catch (IOException e) {
+            throw new UnauthorizedActionException(extract(e));
+        }
+    }
+
+    public User changeUsername(String userId, String username) {
+        try {
+            Map<String, String> body = new LinkedHashMap<>();
+            body.put("username", username);
+            String response = http.put("/users/" + userId + "/username", http.getGson().toJson(body));
+            Map<String, Object> map = http.getGson().fromJson(response, MAP);
+            return JsonMappers.toUser(map);
+        } catch (IOException e) {
+            throw new IllegalArgumentException(extract(e));
+        }
+    }
+
+    public User changePassword(String userId, String password) {
+        try {
+            Map<String, String> body = new LinkedHashMap<>();
+            body.put("password", password);
+            String response = http.put("/users/" + userId + "/password", http.getGson().toJson(body));
+            Map<String, Object> map = http.getGson().fromJson(response, MAP);
+            return JsonMappers.toUser(map);
+        } catch (IOException e) {
+            throw new IllegalArgumentException(extract(e));
+        }
+    }
+
+    public void deleteUser(String userId) {
+        try {
+            http.delete("/users/" + userId);
+        } catch (IOException e) {
+            throw new UnauthorizedActionException(extract(e));
         }
     }
 

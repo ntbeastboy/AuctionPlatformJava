@@ -2,6 +2,9 @@ package com.auction.service;
 
 import com.auction.exception.InvalidInputException;
 import com.auction.exception.UnauthorizedActionException;
+import com.auction.exception.UserNotFoundException;
+import com.auction.model.Admin;
+import com.auction.model.BannableUser;
 import com.auction.model.Bidder;
 import com.auction.model.Seller;
 import com.auction.model.User;
@@ -55,4 +58,66 @@ public class UserService {
     }
     
     public Optional<User> findById(String bidderId) { return userRepository.findById(bidderId);}
+
+    public User banUser(String targetUserId, User adminUser) {
+        requireAdmin(adminUser);
+        if (adminUser.getId().equals(targetUserId))
+            throw new UnauthorizedActionException("Admins cannot ban their own account.");
+        User user = userRepository.findById(targetUserId)
+                .orElseThrow(() -> new UserNotFoundException("User not found: " + targetUserId));
+        if (!(user instanceof BannableUser bu))
+            throw new IllegalStateException("This user type cannot be banned.");
+        bu.banPermanent();
+        userRepository.save(user);
+        return user;
+    }
+
+    public User changeUsername(String targetUserId, String username, User adminUser) {
+        requireAdmin(adminUser);
+        if (username == null || username.isBlank())
+            throw new InvalidInputException("Username cannot be empty.");
+        if (username.contains(" "))
+            throw new InvalidInputException("Usernames cannot contain spaces.");
+
+        User user = userRepository.findById(targetUserId)
+                .orElseThrow(() -> new UserNotFoundException("User not found: " + targetUserId));
+        userRepository.findByUsername(username).ifPresent(existing -> {
+            if (!existing.getId().equals(targetUserId))
+                throw new InvalidInputException("Username already taken.");
+        });
+
+        user.setUsername(username);
+        userRepository.save(user);
+        return user;
+    }
+
+    public User changePassword(String targetUserId, String password, User adminUser) {
+        requireAdmin(adminUser);
+        if (password == null || password.isBlank())
+            throw new InvalidInputException("Password cannot be empty.");
+        if (password.contains(" "))
+            throw new InvalidInputException("Password cannot contain spaces.");
+
+        User user = userRepository.findById(targetUserId)
+                .orElseThrow(() -> new UserNotFoundException("User not found: " + targetUserId));
+        user.setPassword(PasswordUtil.hash(password));
+        userRepository.save(user);
+        return user;
+    }
+
+    public void deleteAccount(String targetUserId, User adminUser) {
+        requireAdmin(adminUser);
+        if (adminUser.getId().equals(targetUserId))
+            throw new UnauthorizedActionException("Admins cannot delete their own account.");
+        User user = userRepository.findById(targetUserId)
+                .orElseThrow(() -> new UserNotFoundException("User not found: " + targetUserId));
+        if (user instanceof Admin)
+            throw new UnauthorizedActionException("Admin accounts cannot be deleted here.");
+        userRepository.delete(targetUserId);
+    }
+
+    private void requireAdmin(User user) {
+        if (!(user instanceof Admin))
+            throw new UnauthorizedActionException("Only admins can manage users.");
+    }
 }

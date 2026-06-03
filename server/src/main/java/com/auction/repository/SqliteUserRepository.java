@@ -83,6 +83,16 @@ public class SqliteUserRepository implements UserRepository {
         }
     }
 
+    @Override
+    public void delete(String id) {
+        try (PreparedStatement ps = conn.prepareStatement("DELETE FROM users WHERE id = ?")) {
+            ps.setString(1, id);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to delete user: " + e.getMessage(), e);
+        }
+    }
+
     private User mapRow(ResultSet rs) throws SQLException {
         String id = rs.getString("id");
         String username = rs.getString("username");

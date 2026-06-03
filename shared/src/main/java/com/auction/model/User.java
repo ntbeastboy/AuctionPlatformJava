@@ -2,7 +2,7 @@ package com.auction.model;
 
 public abstract class User implements Entity {
     private final String id;
-    private final String username;
+    private String username;
     private String password;
 
     public User(String id, String username, String password) {
@@ -15,6 +15,8 @@ public abstract class User implements Entity {
     public String getId() { return id; }
 
     public String getUsername() { return username; }
+
+    public void setUsername(String username) { this.username = username; }
 
     public String getPassword() { return password; }
 

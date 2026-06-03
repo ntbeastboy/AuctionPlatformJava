@@ -153,6 +153,7 @@ class AuctionServiceTest {
         @Override public boolean existsByUsername(String username) { return findByUsername(username).isPresent(); }
         @Override public Optional<User> findById(String id) { return Optional.ofNullable(users.get(id)); }
         @Override public List<User> findAll() { return new ArrayList<>(users.values()); }
+        @Override public void delete(String id) { users.remove(id); }
     }
 
     private static class InMemoryItemRepository implements ItemRepository {
