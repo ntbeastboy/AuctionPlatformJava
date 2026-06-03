@@ -8,6 +8,7 @@ import com.auction.server.controller.BidController;
 import com.auction.server.controller.ItemController;
 import com.auction.server.controller.UserController;
 import com.auction.server.events.ItemEventBroadcaster;
+import com.auction.server.events.UserBanExpiryScheduler;
 import com.auction.service.AuctionService;
 import com.auction.service.BidService;
 import com.auction.service.ItemService;
@@ -38,6 +39,7 @@ public class ServerMain {
         BidService bidService = new BidService(itemRepo, bidRepo, userRepo, autoBidRepo, tx);
         AuctionService auctionService = new AuctionService(itemRepo, userRepo, tx);
         ItemEventBroadcaster eventBroadcaster = new ItemEventBroadcaster();
+        UserBanExpiryScheduler banExpiryScheduler = new UserBanExpiryScheduler(userRepo, eventBroadcaster);
         auctionService.setStatusChangeCallback(eventBroadcaster::broadcastItemsChanged);
         bidService.setItemUpdateCallback(eventBroadcaster::broadcastItemUpdated);
 
@@ -49,9 +51,10 @@ public class ServerMain {
         if (!userRepo.existsByUsername("admin")) {
             userRepo.save(new Admin("admin-0", "admin", PasswordUtil.hash("admin")));
         }
+        banExpiryScheduler.recoverScheduledBans();
 
         // Controllers
-        UserController userController = new UserController(userRepo, itemRepo, autoBidRepo, userService);
+        UserController userController = new UserController(userRepo, itemRepo, autoBidRepo, userService, eventBroadcaster, banExpiryScheduler);
         ItemController itemController = new ItemController(itemRepo, userRepo, itemService, auctionService, eventBroadcaster);
         BidController bidController = new BidController(bidRepo, userRepo, bidService, eventBroadcaster);
         AuctionController auctionController = new AuctionController(userRepo, auctionService, eventBroadcaster);
@@ -65,6 +68,7 @@ public class ServerMain {
             System.out.println("Shutting down server...");
             auctionService.shutdown();
             bidService.shutdown();
+            banExpiryScheduler.shutdown();
             server.stop();
             db.close();
         }));

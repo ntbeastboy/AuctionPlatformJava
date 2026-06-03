@@ -2,6 +2,8 @@ package com.auction.model;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.List;
 
 public abstract class Item implements Entity {
     final String id;
@@ -15,6 +17,7 @@ public abstract class Item implements Entity {
     final String sellerId;
     private AuctionStatus status;
     private String currentWinnerId;
+    private List<String> imageDataList = new ArrayList<>();
     private long version;
 
     public Item(String id, String name, String description, double startingPrice, double priceStep, LocalDateTime bidStartTime, LocalDateTime bidEndTime, String sellerId) {
@@ -68,6 +71,25 @@ public abstract class Item implements Entity {
     public String getCurrentWinnerId() { return currentWinnerId; }
 
     public void setCurrentWinnerId(String currentWinnerId) { this.currentWinnerId = currentWinnerId; }
+
+    public String getImageData() {
+        return imageDataList.isEmpty() ? null : imageDataList.get(0);
+    }
+
+    public void setImageData(String imageData) {
+        imageDataList = new ArrayList<>();
+        if (imageData != null && !imageData.isBlank()) imageDataList.add(imageData);
+    }
+
+    public List<String> getImageDataList() { return new ArrayList<>(imageDataList); }
+
+    public void setImageDataList(List<String> imageDataList) {
+        this.imageDataList = new ArrayList<>();
+        if (imageDataList == null) return;
+        for (String imageData : imageDataList) {
+            if (imageData != null && !imageData.isBlank()) this.imageDataList.add(imageData);
+        }
+    }
 
     public long getVersion() { return version; }
 

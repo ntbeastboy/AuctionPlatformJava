@@ -2,6 +2,8 @@ package com.auction.controller;
 
 import com.auction.app.AppState;
 import com.auction.model.*;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import javafx.application.Platform;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.beans.property.SimpleStringProperty;
@@ -15,16 +17,36 @@ import javafx.scene.chart.NumberAxis;
 import javafx.scene.chart.XYChart;
 import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
 import javafx.scene.layout.GridPane;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
+import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 
+import javax.imageio.IIOImage;
+import javax.imageio.ImageIO;
+import javax.imageio.ImageWriteParam;
+import javax.imageio.ImageWriter;
+import javax.imageio.stream.ImageOutputStream;
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.IOException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
+import java.util.Base64;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.function.Consumer;
@@ -32,11 +54,16 @@ import java.util.function.Consumer;
 public class AuctionListController {
 
     private static final DateTimeFormatter DT_FMT = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss");
+    private static final DateTimeFormatter BAN_EXPIRY_FMT = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
+    private static final int MAX_ITEM_IMAGES = 8;
+    private static final int MAX_IMAGE_EDGE_PX = 1280;
+    private static final float IMAGE_JPEG_QUALITY = 0.82f;
 
     @FXML private Label userInfoLabel;
     @FXML private Button addFundsBtn;
     @FXML private Button withdrawBtn;
     @FXML private TableView<Item> itemTable;
+    @FXML private TableColumn<Item, Item>          colThumbnail;
     @FXML private TableColumn<Item, String>        colName;
     @FXML private TableColumn<Item, String>        colType;
     @FXML private TableColumn<Item, AuctionStatus> colStatus;
@@ -89,22 +116,48 @@ public class AuctionListController {
     return String.format("$%.2f", amount);
     }
     private void setupTable() {
+        itemTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+        colThumbnail.setCellValueFactory(c -> new SimpleObjectProperty<>(c.getValue()));
+        colThumbnail.setCellFactory(col -> new TableCell<>() {
+            private final ImageView view = new ImageView();
+            {
+                view.setFitWidth(76);
+                view.setFitHeight(56);
+                view.setPreserveRatio(true);
+                view.setSmooth(true);
+            }
+
+            @Override
+            protected void updateItem(Item item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null || item.getImageData() == null || item.getImageData().isBlank()) {
+                    setGraphic(new Label("No image"));
+                } else {
+                    view.setImage(toImage(item.getImageData()));
+                    setGraphic(view);
+                }
+                setAlignment(javafx.geometry.Pos.CENTER);
+            }
+        });
         colName.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getName()));
+        centerTextColumn(colName);
         itemTable.setRowFactory(tv -> {
             TableRow<Item> row = new TableRow<>();
+            row.setPrefHeight(72);
             row.setOnMouseClicked(e -> {
                 if (e.getClickCount() == 2 && !row.isEmpty())
-                    showItemDetails(row.getItem());
+                    showItemDetailsCard(row.getItem());
             });
             return row;
         });
         itemTable.getSelectionModel().selectedItemProperty().addListener((obs, oldItem, newItem) -> updatePaySellerButton());
-        colType.setCellValueFactory(c -> new SimpleStringProperty(typeName(c.getValue())));
-        colStatus.setCellValueFactory(new PropertyValueFactory<>("status"));
+        if (colType != null) colType.setCellValueFactory(c -> new SimpleStringProperty(typeName(c.getValue())));
+        if (colStatus != null) colStatus.setCellValueFactory(new PropertyValueFactory<>("status"));
         colPrice.setCellValueFactory(c ->
             new SimpleStringProperty(formatPrice(c.getValue().getCurrentPrice())));
+        centerTextColumn(colPrice);
 
-        colMinBid.setCellValueFactory(c -> {
+        if (colMinBid != null) colMinBid.setCellValueFactory(c -> {
             Item i = c.getValue();
             return new SimpleStringProperty(formatPrice(i.getCurrentPrice() + i.getPriceStep()));
         });
@@ -114,12 +167,24 @@ public class AuctionListController {
             LocalDateTime end = item.getBidEndTime();
             return new SimpleStringProperty(end != null ? end.format(DT_FMT) : "—");
         });
-        colWinner.setCellValueFactory(c -> {
+        centerTextColumn(colEndTime);
+        if (colWinner != null) colWinner.setCellValueFactory(c -> {
             String winnerId = c.getValue().getCurrentWinnerId();
             if (winnerId == null) return new SimpleStringProperty("—");
             String username = appState.userRepository.findById(winnerId)
                     .map(User::getUsername).orElse(winnerId);
             return new SimpleStringProperty(username);
+        });
+    }
+
+    private void centerTextColumn(TableColumn<Item, String> column) {
+        column.setCellFactory(col -> new TableCell<>() {
+            @Override
+            protected void updateItem(String value, boolean empty) {
+                super.updateItem(value, empty);
+                setText(empty ? null : value);
+                setAlignment(javafx.geometry.Pos.CENTER);
+            }
         });
     }
 
@@ -318,9 +383,44 @@ public class AuctionListController {
     @FXML
     private void onBanUser() {
         withSelectedUser(user -> {
-            appState.restUserService.banUser(user.getId());
+            if (user instanceof Admin) {
+                showStatus("Admin accounts cannot be banned.", true);
+                return;
+            }
+            TextInputDialog dlg = new TextInputDialog(LocalDateTime.now().plusDays(7).format(BAN_EXPIRY_FMT));
+            dlg.setTitle("Ban User");
+            dlg.setHeaderText("Enter automatic unban date and time (DD/MM/YYYY HH:MM):");
+            dlg.showAndWait().ifPresent(expiryText -> {
+                try {
+                    LocalDateTime expiry = LocalDateTime.parse(expiryText.trim(), BAN_EXPIRY_FMT);
+                    LocalDateTime now = LocalDateTime.now();
+                    if (!expiry.isAfter(now)) {
+                        showStatus("Unban time must be later than the current date and time.", true);
+                        return;
+                    }
+                    long durationSeconds = Math.max(1, java.time.Duration.between(now, expiry).getSeconds());
+                    appState.restUserService.banUser(user.getId(), durationSeconds);
+                    refreshUsers();
+                    showStatus("User banned until " + expiry.format(BAN_EXPIRY_FMT) + ".", false);
+                } catch (DateTimeParseException e) {
+                    showStatus("Use DD/MM/YYYY HH:MM, e.g. 25/12/2026 14:30.", true);
+                } catch (Exception e) {
+                    showStatus(e.getMessage(), true);
+                }
+            });
+        });
+    }
+
+    @FXML
+    private void onUnbanUser() {
+        withSelectedUser(user -> {
+            if (user instanceof Admin) {
+                showStatus("Admin accounts cannot be unbanned.", true);
+                return;
+            }
+            appState.restUserService.unbanUser(user.getId());
             refreshUsers();
-            showStatus("User banned.", false);
+            showStatus("User unbanned.", false);
         });
     }
 
@@ -373,6 +473,10 @@ public class AuctionListController {
     @FXML
     private void onDeleteUser() {
         withSelectedUser(user -> {
+            if (user instanceof Admin) {
+                showStatus("Admin accounts cannot be deleted.", true);
+                return;
+            }
             Alert confirm = new Alert(Alert.AlertType.CONFIRMATION);
             confirm.setTitle("Delete Account");
             confirm.setHeaderText("Delete account \"" + user.getUsername() + "\"?");
@@ -415,12 +519,14 @@ public class AuctionListController {
     }
 
     private String balanceOf(User user) {
+        if (user instanceof Admin) return "";
         if (user instanceof Bidder b) return "$" + String.format("%.2f", b.getBalance());
         if (user instanceof Seller s) return "$" + String.format("%.2f", s.getBalance());
         return "â€”";
     }
 
     private String bannedText(User user) {
+        if (user instanceof Admin) return "";
         if (user instanceof BannableUser bu) return bu.isBanned() ? "Yes" : "No";
         return "N/A";
     }
@@ -437,11 +543,58 @@ public class AuctionListController {
 
     private void registerRealtimeUpdates() {
         removeRealtimeUpdates();
-        updateListener = message -> Platform.runLater(() -> {
+        updateListener = message -> Platform.runLater(() -> handleRealtimeUpdate(message));
+        appState.httpClient.addUpdateListener(updateListener);
+    }
+
+    private void handleRealtimeUpdate(String message) {
+        String type = null;
+        String userId = null;
+        try {
+            JsonObject event = JsonParser.parseString(message).getAsJsonObject();
+            if (event.has("type") && !event.get("type").isJsonNull()) type = event.get("type").getAsString();
+            if (event.has("userId") && !event.get("userId").isJsonNull()) userId = event.get("userId").getAsString();
+        } catch (Exception ignored) { }
+
+        if ("ITEM_UPDATED".equals(type) || "ITEMS_CHANGED".equals(type)) {
             refreshCurrentUser();
             refreshTable();
-        });
-        appState.httpClient.addUpdateListener(updateListener);
+            return;
+        }
+
+        if ("USERS_CHANGED".equals(type)) {
+            refreshUsers();
+            refreshCurrentUserAndLogoutIfUnavailable();
+            return;
+        }
+
+        if ("USER_DELETED".equals(type)) {
+            refreshUsers();
+            if (isCurrentUser(userId)) {
+                forceLogout("Your account was deleted by an administrator.");
+            }
+            return;
+        }
+
+        if ("USER_BANNED".equals(type)) {
+            refreshUsers();
+            if (isCurrentUser(userId)) {
+                forceLogout("Your account was banned by an administrator.");
+            }
+            return;
+        }
+
+        if ("USER_UPDATED".equals(type)) {
+            refreshUsers();
+            if (isCurrentUser(userId)) {
+                refreshCurrentUserAndLogoutIfUnavailable();
+            }
+            return;
+        }
+
+        refreshCurrentUser();
+        refreshTable();
+        refreshUsers();
     }
 
     private void removeRealtimeUpdates() {
@@ -463,6 +616,54 @@ public class AuctionListController {
         } catch (Exception ignored) { }
     }
 
+    private void refreshCurrentUserAndLogoutIfUnavailable() {
+        if (appState.currentUser == null) return;
+        try {
+            User fresh = appState.restUserService.refresh(appState.currentUser.getId());
+            if (fresh == null) {
+                forceLogout("Your account is no longer available.");
+                return;
+            }
+            appState.currentUser = fresh;
+            if (fresh instanceof BannableUser bu && bu.isBanned()) {
+                forceLogout("Your account was banned by an administrator.");
+                return;
+            }
+            refreshUserInfo();
+        } catch (Exception e) {
+            forceLogout("Your account is no longer available.");
+        }
+    }
+
+    private boolean isCurrentUser(String userId) {
+        return userId != null && appState.currentUser != null && userId.equals(appState.currentUser.getId());
+    }
+
+    private void forceLogout(String message) {
+        try {
+            removeRealtimeUpdates();
+            appState.auctionService.setStatusChangeCallback(null);
+            appState.restUserService.logout();
+            appState.currentUser = null;
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/login.fxml"));
+            Scene scene = new Scene(loader.load(), 520, 440);
+            scene.getStylesheets().add(getClass().getResource("/css/style.css").toExternalForm());
+            LoginController controller = loader.getController();
+            controller.init(appState, stage);
+            stage.setScene(scene);
+            stage.setResizable(false);
+            stage.setTitle("Auction Platform");
+            if (message != null && !message.isBlank()) {
+                Alert alert = new Alert(Alert.AlertType.INFORMATION);
+                alert.setTitle("Logged out");
+                alert.setHeaderText(message);
+                alert.show();
+            }
+        } catch (IOException e) {
+            showStatus(e.getMessage(), true);
+        }
+    }
+
     private void refreshUserInfo() {
         String role = appState.currentUser.getClass().getSimpleName();
         String balance = "";
@@ -474,6 +675,191 @@ public class AuctionListController {
     private void showStatus(String msg, boolean isError) {
         statusLabel.setStyle(isError ? "-fx-text-fill: #c0392b;" : "-fx-text-fill: #27ae60;");
         statusLabel.setText(msg);
+    }
+
+    private void showItemDetailsCard(Item item) {
+        String winnerId = item.getCurrentWinnerId();
+        String winner = winnerId == null ? "No winner yet"
+                : appState.userRepository.findById(winnerId).map(User::getUsername).orElse(winnerId);
+
+        List<String> images = item.getImageDataList();
+        int[] imageIndex = {0};
+        ImageView imageView = new ImageView();
+        imageView.setFitWidth(260);
+        imageView.setFitHeight(220);
+        imageView.setPreserveRatio(true);
+        imageView.setSmooth(true);
+
+        VBox imagePane = new VBox();
+        imagePane.setSpacing(14);
+        imagePane.setMinWidth(280);
+        imagePane.setAlignment(javafx.geometry.Pos.CENTER);
+        imagePane.setStyle("-fx-background-color: #f8fafc; -fx-border-color: #e2e8f0; -fx-border-radius: 10; -fx-background-radius: 10; -fx-padding: 12;");
+        Label imageCounter = new Label();
+        Button prevImageBtn = new Button("Previous");
+        Button nextImageBtn = new Button("Next");
+        HBox imageControls = new HBox(8, prevImageBtn, imageCounter, nextImageBtn);
+        imageControls.setAlignment(javafx.geometry.Pos.CENTER);
+        imageControls.setPadding(new Insets(10, 0, 0, 0));
+
+        Runnable renderImage = () -> {
+            if (images.isEmpty()) return;
+            imageView.setImage(toImage(images.get(imageIndex[0])));
+            imageCounter.setText((imageIndex[0] + 1) + " / " + images.size());
+            prevImageBtn.setDisable(images.size() <= 1);
+            nextImageBtn.setDisable(images.size() <= 1);
+        };
+        prevImageBtn.setOnAction(e -> {
+            imageIndex[0] = (imageIndex[0] - 1 + images.size()) % images.size();
+            renderImage.run();
+        });
+        nextImageBtn.setOnAction(e -> {
+            imageIndex[0] = (imageIndex[0] + 1) % images.size();
+            renderImage.run();
+        });
+
+        if (images.isEmpty()) {
+            Label noImage = new Label("No image");
+            noImage.setStyle("-fx-text-fill: #64748b; -fx-font-size: 16px; -fx-font-weight: 600;");
+            imagePane.getChildren().add(noImage);
+        } else {
+            imageView.setStyle("-fx-cursor: hand;");
+            imageView.setOnMouseClicked(e -> openImageViewer(images.get(imageIndex[0])));
+            renderImage.run();
+            imagePane.getChildren().addAll(imageView, imageControls);
+        }
+
+        Label title = new Label(item.getName());
+        title.setStyle("-fx-font-size: 22px; -fx-font-weight: 800; -fx-text-fill: #0f172a;");
+        title.setWrapText(true);
+
+        Label price = new Label(formatPrice(item.getCurrentPrice()));
+        price.setStyle("-fx-font-size: 20px; -fx-font-weight: 800; -fx-text-fill: #4f46e5;");
+
+        Label description = new Label(item.getDescription() == null || item.getDescription().isBlank()
+                ? "No description provided." : item.getDescription());
+        description.setWrapText(true);
+        description.setStyle("-fx-text-fill: #475569;");
+
+        GridPane auction = detailGrid();
+        int r = 0;
+        r = addDetail(auction, r, "Type", typeName(item));
+        r = addDetail(auction, r, "Status", item.getStatus().toString());
+        r = addDetail(auction, r, "Starting price", "$" + String.format("%,.2f", item.getStartingPrice()));
+        r = addDetail(auction, r, "Price step", "$" + String.format("%,.2f", item.getPriceStep()));
+        r = addDetail(auction, r, "Start time", item.getStatus() != AuctionStatus.OPEN && item.getBidStartTime() != null ? item.getBidStartTime().format(DT_FMT) : "Not started");
+        r = addDetail(auction, r, "End bid time", item.getStatus() != AuctionStatus.OPEN && item.getBidEndTime() != null ? item.getBidEndTime().format(DT_FMT) : "Not scheduled");
+        addDetail(auction, r, "Winner", winner);
+
+        GridPane specs = detailGrid();
+        int s = 0;
+        if (item instanceof Art a) {
+            s = addDetail(specs, s, "Artist", a.getArtist());
+            s = addDetail(specs, s, "Painting style", a.getPaintingStyle());
+            addDetail(specs, s, "Origin", a.getOrigin());
+        } else if (item instanceof Electronics e) {
+            s = addDetail(specs, s, "Wattage", e.getWattage() + " W");
+            s = addDetail(specs, s, "Origin", e.getOrigin());
+            s = addDetail(specs, s, "Warranty", e.getWarrantyMonths() + " months");
+            addDetail(specs, s, "Serial no.", e.getSerialNumber());
+        } else if (item instanceof Vehicle v) {
+            s = addDetail(specs, s, "Brand", v.getBrand());
+            s = addDetail(specs, s, "Miles", String.valueOf(v.getMiles()));
+            s = addDetail(specs, s, "Mfg date", v.getManufacturingDate() != null ? v.getManufacturingDate().toString() : "N/A");
+            s = addDetail(specs, s, "VIN", v.getVin());
+            addDetail(specs, s, "Accident history", v.hasAccidentHistory() ? "Yes" : "No");
+        } else {
+            addDetail(specs, s, "Category", "General item");
+        }
+
+        VBox info = new VBox(12, title, price, description, section("Auction", auction), section("Details", specs));
+        HBox.setHgrow(info, Priority.ALWAYS);
+        HBox root = new HBox(18, imagePane, info);
+        root.setPadding(new Insets(18));
+        root.setStyle("-fx-background-color: white;");
+
+        Stage detailStage = new Stage();
+        detailStage.setTitle("Item Details");
+        Scene scene = new Scene(root, 760, 460);
+        scene.getStylesheets().add(getClass().getResource("/css/style.css").toExternalForm());
+        detailStage.setScene(scene);
+        detailStage.show();
+    }
+
+    private VBox section(String title, GridPane grid) {
+        Label label = new Label(title);
+        label.setStyle("-fx-font-size: 14px; -fx-font-weight: 800; -fx-text-fill: #0f172a;");
+        return new VBox(6, label, grid);
+    }
+
+    private GridPane detailGrid() {
+        GridPane grid = new GridPane();
+        grid.setHgap(14);
+        grid.setVgap(6);
+        return grid;
+    }
+
+    private int addDetail(GridPane grid, int row, String key, String value) {
+        Label k = new Label(key);
+        k.setStyle("-fx-font-weight: 700; -fx-text-fill: #64748b;");
+        Label v = new Label(value == null || value.isBlank() ? "N/A" : value);
+        v.setWrapText(true);
+        v.setStyle("-fx-text-fill: #0f172a;");
+        grid.add(k, 0, row);
+        grid.add(v, 1, row);
+        return row + 1;
+    }
+
+    private void openImageViewer(String imageData) {
+        Image image = toImage(imageData);
+        if (image == null) return;
+
+        ImageView viewer = new ImageView(image);
+        viewer.setPreserveRatio(true);
+        viewer.setSmooth(true);
+
+        double[] zoom = {1.0};
+        Runnable applyZoom = () -> {
+            viewer.setFitWidth(Math.max(240, image.getWidth() * zoom[0]));
+            viewer.setFitHeight(Math.max(180, image.getHeight() * zoom[0]));
+        };
+
+        Button zoomOut = new Button("Zoom Out");
+        Button zoomIn = new Button("Zoom In");
+        Button reset = new Button("Reset");
+        zoomOut.setOnAction(e -> {
+            zoom[0] = Math.max(0.25, zoom[0] / 1.25);
+            applyZoom.run();
+        });
+        zoomIn.setOnAction(e -> {
+            zoom[0] = Math.min(5.0, zoom[0] * 1.25);
+            applyZoom.run();
+        });
+        reset.setOnAction(e -> {
+            zoom[0] = 1.0;
+            applyZoom.run();
+        });
+        applyZoom.run();
+
+        HBox toolbar = new HBox(8, zoomOut, reset, zoomIn);
+        toolbar.setAlignment(javafx.geometry.Pos.CENTER);
+        toolbar.setPadding(new Insets(10));
+
+        ScrollPane scroller = new ScrollPane(viewer);
+        scroller.setPannable(true);
+        scroller.setFitToWidth(false);
+        scroller.setFitToHeight(false);
+        scroller.setStyle("-fx-background-color: #0f172a;");
+
+        VBox root = new VBox(toolbar, scroller);
+        VBox.setVgrow(scroller, Priority.ALWAYS);
+
+        Stage imageStage = new Stage();
+        imageStage.setTitle("Item Image");
+        Scene scene = new Scene(root, 1000, 760);
+        scene.getStylesheets().add(getClass().getResource("/css/style.css").toExternalForm());
+        imageStage.setScene(scene);
+        imageStage.show();
     }
 
     private void showItemDetails(Item item) {
@@ -544,6 +930,55 @@ public class AuctionListController {
      * Shows a dialog asking for amount and card details.
      * Returns the validated amount, or empty if cancelled or validation failed.
      */
+    private Image toImage(String dataUrl) {
+        try {
+            String base64 = dataUrl;
+            int comma = dataUrl.indexOf(',');
+            if (comma >= 0) base64 = dataUrl.substring(comma + 1);
+            byte[] bytes = Base64.getDecoder().decode(base64);
+            return new Image(new ByteArrayInputStream(bytes));
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private String imageDataUrl(File file) throws IOException {
+        BufferedImage source = ImageIO.read(file);
+        if (source == null) throw new IOException("Unsupported image file.");
+
+        int width = source.getWidth();
+        int height = source.getHeight();
+        double scale = Math.min(1.0, (double) MAX_IMAGE_EDGE_PX / Math.max(width, height));
+        int targetWidth = Math.max(1, (int) Math.round(width * scale));
+        int targetHeight = Math.max(1, (int) Math.round(height * scale));
+
+        BufferedImage output = new BufferedImage(targetWidth, targetHeight, BufferedImage.TYPE_INT_RGB);
+        Graphics2D g = output.createGraphics();
+        try {
+            g.setColor(java.awt.Color.WHITE);
+            g.fillRect(0, 0, targetWidth, targetHeight);
+            g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+            g.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+            g.drawImage(source, 0, 0, targetWidth, targetHeight, null);
+        } finally {
+            g.dispose();
+        }
+
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        ImageWriter writer = ImageIO.getImageWritersByFormatName("jpg").next();
+        try (ImageOutputStream ios = ImageIO.createImageOutputStream(out)) {
+            writer.setOutput(ios);
+            ImageWriteParam param = writer.getDefaultWriteParam();
+            param.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
+            param.setCompressionQuality(IMAGE_JPEG_QUALITY);
+            writer.write(null, new IIOImage(output, null, null), param);
+        } finally {
+            writer.dispose();
+        }
+
+        return "data:image/jpeg;base64," + Base64.getEncoder().encodeToString(out.toByteArray());
+    }
+
     private java.util.Optional<Double> showCardDialog() {
         Dialog<Double> dlg = new Dialog<>();
         dlg.setTitle("Add Funds");
@@ -721,6 +1156,28 @@ public class AuctionListController {
         TextField startPriceF   = field("0");
         TextField priceStepF    = field("1");
         TextField durationMinsF = field("60");
+        List<String> imageData = new ArrayList<>(editing ? existing.getImageDataList() : List.of());
+        Label imageNameLbl = new Label(imageData.isEmpty() ? "No images selected" : imageData.size() + " image(s) selected");
+        imageNameLbl.setStyle("-fx-text-fill: #475569;");
+        Button chooseImageBtn = new Button("Choose Images");
+        chooseImageBtn.setOnAction(e -> {
+            FileChooser chooser = new FileChooser();
+            chooser.setTitle("Choose item images");
+            chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Images", "*.png", "*.jpg", "*.jpeg", "*.gif"));
+            List<File> files = chooser.showOpenMultipleDialog(stage);
+            if (files == null || files.isEmpty()) return;
+            if (files.size() > MAX_ITEM_IMAGES) {
+                imageNameLbl.setText("Choose up to " + MAX_ITEM_IMAGES + " images");
+                return;
+            }
+            try {
+                imageData.clear();
+                for (File file : files) imageData.add(imageDataUrl(file));
+                imageNameLbl.setText(files.size() + " image(s) selected");
+            } catch (IOException ex) {
+                imageNameLbl.setText("Could not load images");
+            }
+        });
         if (editing) {
             nameF.setText(existing.getName());
             descF.setText(existing.getDescription());
@@ -764,6 +1221,8 @@ public class AuctionListController {
         grid.add(new Label("Starting price:"),   0, r); grid.add(startPriceF,   1, r++);
         grid.add(new Label("Price step:"),       0, r); grid.add(priceStepF,    1, r++);
         grid.add(new Label("Duration (mins):"),  0, r); grid.add(durationMinsF, 1, r++);
+        grid.add(new Label("Image:"),            0, r);
+        grid.add(new HBox(8, chooseImageBtn, imageNameLbl), 1, r++);
 
         final int DYNAMIC_START = r;
 
@@ -844,6 +1303,8 @@ public class AuctionListController {
                 attrs.put("brand", brandF.getText().trim());
                 attrs.put("vin", vinF.getText().trim());
                 attrs.put("accidentHistory", accidentBox.isSelected());
+                attrs.put("imageDataList", new ArrayList<>(imageData));
+                attrs.put("imageData", imageData.isEmpty() ? null : imageData.get(0));
 
                 Item item = ItemFactory.defaultFactory().create(typeBox.getValue(), id, name, desc, sp, step, start, end, sid, attrs);
                 if (editing) {

@@ -107,9 +107,11 @@ public class DatabaseManager {
                     brand TEXT,
                     vin TEXT,
                     accident_history INTEGER DEFAULT 0,
+                    image_data TEXT,
                     version INTEGER NOT NULL DEFAULT 0
                 )
             """);
+            ensureColumn(stmt, "items", "image_data", "TEXT");
 
             stmt.executeUpdate("""
                 CREATE TABLE IF NOT EXISTS bids (
@@ -139,6 +141,15 @@ public class DatabaseManager {
             stmt.executeUpdate("CREATE INDEX IF NOT EXISTS idx_auto_bids_item_id ON auto_bids(item_id)");
             stmt.executeUpdate("CREATE INDEX IF NOT EXISTS idx_auto_bids_user_id ON auto_bids(user_id)");
         }
+    }
+
+    private void ensureColumn(Statement stmt, String table, String column, String definition) throws SQLException {
+        try (var rs = stmt.executeQuery("PRAGMA table_info(" + table + ")")) {
+            while (rs.next()) {
+                if (column.equalsIgnoreCase(rs.getString("name"))) return;
+            }
+        }
+        stmt.executeUpdate("ALTER TABLE " + table + " ADD COLUMN " + column + " " + definition);
     }
 
     public void close() {

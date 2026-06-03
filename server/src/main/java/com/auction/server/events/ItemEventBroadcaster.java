@@ -26,6 +26,25 @@ public class ItemEventBroadcaster {
         broadcast("{\"type\":\"ITEMS_CHANGED\"}");
     }
 
+    public void broadcastUserUpdated(String userId) {
+        broadcast("{\"type\":\"USER_UPDATED\",\"userId\":\"" + escapeJson(userId) + "\"}");
+        broadcastUsersChanged();
+    }
+
+    public void broadcastUserBanned(String userId) {
+        broadcast("{\"type\":\"USER_BANNED\",\"userId\":\"" + escapeJson(userId) + "\"}");
+        broadcastUsersChanged();
+    }
+
+    public void broadcastUserDeleted(String userId) {
+        broadcast("{\"type\":\"USER_DELETED\",\"userId\":\"" + escapeJson(userId) + "\"}");
+        broadcastUsersChanged();
+    }
+
+    public void broadcastUsersChanged() {
+        broadcast("{\"type\":\"USERS_CHANGED\"}");
+    }
+
     private void broadcast(String message) {
         for (WsContext client : clients) {
             try {

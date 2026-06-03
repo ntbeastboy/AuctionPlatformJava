@@ -110,8 +110,7 @@ public class SqliteUserRepository implements UserRepository {
                 if (banType != null) {
                     if ("PERMANENT".equals(banType)) b.banPermanent();
                     else if ("TEMPORARY".equals(banType)) {
-                        long remaining = banExpiry - System.currentTimeMillis() / 1000L;
-                        if (remaining > 0) b.banTemporary(remaining);
+                        b.restoreTemporaryBan(banExpiry);
                     }
                 }
                 yield b;
@@ -122,8 +121,7 @@ public class SqliteUserRepository implements UserRepository {
                 if (banType != null) {
                     if ("PERMANENT".equals(banType)) s.banPermanent();
                     else if ("TEMPORARY".equals(banType)) {
-                        long remaining = banExpiry - System.currentTimeMillis() / 1000L;
-                        if (remaining > 0) s.banTemporary(remaining);
+                        s.restoreTemporaryBan(banExpiry);
                     }
                 }
                 yield s;

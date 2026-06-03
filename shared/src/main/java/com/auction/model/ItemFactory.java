@@ -23,7 +23,7 @@ public interface ItemFactory {
                            double priceStep, LocalDateTime bidStartTime, LocalDateTime bidEndTime,
                            String sellerId, Map<String, Object> attributes) {
             Map<String, Object> attrs = attributes == null ? Map.of() : attributes;
-            return switch (type == null ? "Other" : type) {
+            Item item = switch (type == null ? "Other" : type) {
                 case "Art" -> new Art(id, name, description, startingPrice, priceStep, bidStartTime, bidEndTime,
                         sellerId, str(attrs, "artist"), str(attrs, "paintingStyle"), str(attrs, "origin"));
                 case "Electronics" -> new Electronics(id, name, description, startingPrice, priceStep,
@@ -36,11 +36,25 @@ public interface ItemFactory {
                         bidStartTime, bidEndTime, sellerId, str(attrs, "category"), str(attrs, "condition"));
                 default -> new Other(id, name, description, startingPrice, priceStep, bidStartTime, bidEndTime, sellerId);
             };
+            item.setImageDataList(stringList(attrs, "imageDataList"));
+            if (item.getImageDataList().isEmpty()) item.setImageData(str(attrs, "imageData"));
+            return item;
         }
 
         private static String str(Map<String, Object> attrs, String key) {
             Object value = attrs.get(key);
             return value == null ? null : value.toString();
+        }
+
+        private static java.util.List<String> stringList(Map<String, Object> attrs, String key) {
+            Object value = attrs.get(key);
+            if (value instanceof java.util.List<?> list) {
+                return list.stream()
+                        .filter(v -> v != null && !v.toString().isBlank())
+                        .map(Object::toString)
+                        .toList();
+            }
+            return java.util.List.of();
         }
 
         private static int integer(Map<String, Object> attrs, String key) {

@@ -44,8 +44,7 @@ public class BidService {
     private static final long ANTI_SNIPING_EXTENSION_SECONDS = 60L;
     private static final Comparator<AutoBid> AUTO_BID_PRIORITY =
             Comparator.comparingLong(AutoBid::getNextCheckAt)
-                    .thenComparing(Comparator.comparingDouble(AutoBid::getMaxBid).reversed())
-                    .thenComparing(AutoBid::getUserId, BidService::compareUserIds);
+                    .thenComparing(Comparator.comparingDouble(AutoBid::getMaxBid).reversed());
 
     private final ItemRepository itemRepository;
     private final BidRepository bidRepository;
@@ -401,11 +400,20 @@ public class BidService {
     }
 
     private List<AutoBid> lowerPriorityAutoBidsAtSameCheck(List<AutoBid> autoBids, AutoBid winner, long checkAt) {
-        return autoBids.stream()
-                .filter(a -> !a.getUserId().equals(winner.getUserId()))
+        List<AutoBid> sameCheckAutoBids = autoBids.stream()
                 .filter(a -> nextCheckAt(a) == checkAt)
-                .filter(a -> AUTO_BID_PRIORITY.compare(winner, a) < 0)
                 .toList();
+
+        List<AutoBid> lowerPriority = new ArrayList<>();
+        boolean foundWinner = false;
+        for (AutoBid autoBid : sameCheckAutoBids.stream().sorted(AUTO_BID_PRIORITY).toList()) {
+            if (autoBid.getUserId().equals(winner.getUserId())) {
+                foundWinner = true;
+            } else if (foundWinner) {
+                lowerPriority.add(autoBid);
+            }
+        }
+        return lowerPriority;
     }
 
     private OptionalLong nextRetryAt(List<AutoBid> autoBids, long now) {
@@ -533,17 +541,6 @@ public class BidService {
     private void requireAutoBidRepository() {
         if (autoBidRepository == null)
             throw new UnsupportedOperationException("Auto-bidding is not available for this BidService.");
-    }
-
-    private static int compareUserIds(String left, String right) {
-        if (left == null && right == null) return 0;
-        if (left == null) return -1;
-        if (right == null) return 1;
-        try {
-            return Long.compare(Long.parseLong(left), Long.parseLong(right));
-        } catch (NumberFormatException ignored) {
-            return left.compareTo(right);
-        }
     }
 
     private record AutoBidResolution(boolean changed, OptionalLong nextRetryAt) {}

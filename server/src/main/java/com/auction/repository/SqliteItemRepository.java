@@ -14,7 +14,6 @@ import java.util.Optional;
 public class SqliteItemRepository implements ItemRepository {
 
     private final Connection conn;
-
     public SqliteItemRepository(DatabaseManager dbManager) {
         this.conn = dbManager.getConnection();
     }
@@ -27,12 +26,12 @@ public class SqliteItemRepository implements ItemRepository {
                 bid_start_time, bid_end_time, seller_id, status, current_winner_id,
                 item_type, category, item_condition, artist, painting_style, origin,
                 wattage, warranty_months, serial_number, miles, manufacturing_date,
-                brand, vin, accident_history, version
-            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                brand, vin, accident_history, image_data, version
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         """;
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             setItemParams(ps, item);
-            ps.setLong(26, item.getVersion());
+            ps.setLong(27, item.getVersion());
             ps.executeUpdate();
         } catch (SQLException e) {
             throw new RuntimeException("Failed to save item: " + e.getMessage(), e);
@@ -88,13 +87,14 @@ public class SqliteItemRepository implements ItemRepository {
                 item_condition = ?, artist = ?, painting_style = ?, origin = ?,
                 wattage = ?, warranty_months = ?, serial_number = ?, miles = ?,
                 manufacturing_date = ?, brand = ?, vin = ?, accident_history = ?,
+                image_data = ?,
                 version = version + 1
             WHERE id = ? AND version = ?
         """;
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             setUpdateParams(ps, item);
-            ps.setString(25, item.getId());
-            ps.setLong(26, item.getVersion());
+            ps.setString(26, item.getId());
+            ps.setLong(27, item.getVersion());
             int rows = ps.executeUpdate();
             if (rows == 0) {
                 throw new StaleObjectException(
@@ -113,7 +113,7 @@ public class SqliteItemRepository implements ItemRepository {
     }
 
     /**
-     * Binds the 24 mutable item columns (everything except id and version)
+     * Binds the 25 mutable item columns (everything except id and version)
      * starting at the given JDBC index.
      */
     private void setUpdateParams(PreparedStatement ps, Item item) throws SQLException {
@@ -173,6 +173,7 @@ public class SqliteItemRepository implements ItemRepository {
         ps.setString(start + 21, brand);
         ps.setString(start + 22, vin);
         ps.setInt(start + 23, accidentHistory);
+        ps.setString(start + 24, imagesToJson(item.getImageDataList()));
     }
 
     private Item mapRow(ResultSet rs) throws SQLException {
@@ -214,8 +215,55 @@ public class SqliteItemRepository implements ItemRepository {
         item.setCurrentPrice(currentPrice);
         item.setStatus(AuctionStatus.valueOf(statusStr));
         item.setCurrentWinnerId(winnerId);
+        item.setImageDataList(parseImages(rs.getString("image_data")));
         item.setVersion(rs.getLong("version"));
         return item;
+    }
+
+    private List<String> parseImages(String raw) {
+        if (raw == null || raw.isBlank()) return List.of();
+        if (raw.trim().startsWith("[")) return imagesFromJson(raw);
+        return List.of(raw);
+    }
+
+    private String imagesToJson(List<String> images) {
+        StringBuilder sb = new StringBuilder("[");
+        for (int i = 0; i < images.size(); i++) {
+            if (i > 0) sb.append(',');
+            sb.append('"')
+                    .append(images.get(i).replace("\\", "\\\\").replace("\"", "\\\""))
+                    .append('"');
+        }
+        return sb.append(']').toString();
+    }
+
+    private List<String> imagesFromJson(String raw) {
+        List<String> result = new ArrayList<>();
+        String s = raw.trim();
+        if (s.length() < 2) return result;
+        StringBuilder current = new StringBuilder();
+        boolean inString = false;
+        boolean escaped = false;
+        for (int i = 1; i < s.length() - 1; i++) {
+            char ch = s.charAt(i);
+            if (!inString) {
+                if (ch == '"') inString = true;
+                continue;
+            }
+            if (escaped) {
+                current.append(ch);
+                escaped = false;
+            } else if (ch == '\\') {
+                escaped = true;
+            } else if (ch == '"') {
+                result.add(current.toString());
+                current.setLength(0);
+                inString = false;
+            } else {
+                current.append(ch);
+            }
+        }
+        return result;
     }
 
     private String itemType(Item item) {

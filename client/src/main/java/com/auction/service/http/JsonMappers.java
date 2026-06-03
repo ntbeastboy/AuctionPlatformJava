@@ -55,7 +55,15 @@ public final class JsonMappers {
 
     private static void applyBan(BannableUser u, Map<String, Object> map) {
         Object banned = map.get("banned");
-        if (Boolean.TRUE.equals(banned)) u.banPermanent();
+        if (!Boolean.TRUE.equals(banned)) return;
+        String banType = str(map, "banType");
+        long banExpiry = Math.round(num(map, "banExpiryUnix"));
+        if ("TEMPORARY".equalsIgnoreCase(banType) && banExpiry > 0) {
+            long remaining = banExpiry - System.currentTimeMillis() / 1000L;
+            if (remaining > 0) u.banTemporary(remaining);
+        } else {
+            u.banPermanent();
+        }
     }
 
     public static Item toItem(Map<String, Object> map) {

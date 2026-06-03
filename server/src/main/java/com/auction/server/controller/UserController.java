@@ -7,6 +7,8 @@ import com.auction.repository.AutoBidRepository;
 import com.auction.repository.ItemRepository;
 import com.auction.repository.UserRepository;
 import com.auction.security.JwtUtil;
+import com.auction.server.events.ItemEventBroadcaster;
+import com.auction.server.events.UserBanExpiryScheduler;
 import com.auction.service.UserService;
 import io.javalin.http.Context;
 
@@ -19,17 +21,34 @@ public class UserController {
     private final ItemRepository itemRepo;
     private final AutoBidRepository autoBidRepo;
     private final UserService userService;
+    private final ItemEventBroadcaster eventBroadcaster;
+    private final UserBanExpiryScheduler banExpiryScheduler;
 
     public UserController(UserRepository userRepo, UserService userService) {
-        this(userRepo, null, null, userService);
+        this(userRepo, null, null, userService, null, null);
     }
 
     public UserController(UserRepository userRepo, ItemRepository itemRepo,
                           AutoBidRepository autoBidRepo, UserService userService) {
+        this(userRepo, itemRepo, autoBidRepo, userService, null, null);
+    }
+
+    public UserController(UserRepository userRepo, ItemRepository itemRepo,
+                          AutoBidRepository autoBidRepo, UserService userService,
+                          ItemEventBroadcaster eventBroadcaster) {
+        this(userRepo, itemRepo, autoBidRepo, userService, eventBroadcaster, null);
+    }
+
+    public UserController(UserRepository userRepo, ItemRepository itemRepo,
+                          AutoBidRepository autoBidRepo, UserService userService,
+                          ItemEventBroadcaster eventBroadcaster,
+                          UserBanExpiryScheduler banExpiryScheduler) {
         this.userRepo = userRepo;
         this.itemRepo = itemRepo;
         this.autoBidRepo = autoBidRepo;
         this.userService = userService;
+        this.eventBroadcaster = eventBroadcaster;
+        this.banExpiryScheduler = banExpiryScheduler;
     }
 
     public void handleLogin(Context ctx) {
@@ -47,6 +66,7 @@ public class UserController {
         UserService.RegisterRole role = UserService.RegisterRole.valueOf(roleStr);
         User user = userService.register(body.get("username"), body.get("password"), role);
         String token = JwtUtil.generateToken(user.getId(), roleOf(user));
+        broadcastUsersChanged();
         ctx.status(201).json(userToMapWithToken(user, token));
     }
 
@@ -79,6 +99,7 @@ public class UserController {
         else if (user instanceof Seller s) s.addFunds(amount);
         else throw new IllegalStateException("Cannot add balance to this user type.");
         userRepo.save(user);
+        broadcastUserUpdated(id);
         ctx.json(userToMap(user));
     }
 
@@ -97,12 +118,23 @@ public class UserController {
         else if (user instanceof Seller s) s.withdraw(amount);
         else throw new IllegalStateException("Cannot deduct balance from this user type.");
         userRepo.save(user);
+        broadcastUserUpdated(id);
         ctx.json(userToMap(user));
     }
 
     public void handleBanUser(Context ctx) {
         String id = ctx.pathParam("id");
-        User user = userService.banUser(id, getAuthenticatedUser(ctx));
+        long durationSeconds = Long.parseLong(ctx.queryParam("durationSeconds"));
+        User user = userService.banUser(id, durationSeconds, getAuthenticatedUser(ctx));
+        if (banExpiryScheduler != null) banExpiryScheduler.scheduleIfTemporary(user);
+        broadcastUserBanned(id);
+        ctx.json(userToMap(user));
+    }
+
+    public void handleUnbanUser(Context ctx) {
+        String id = ctx.pathParam("id");
+        User user = userService.unbanUser(id, getAuthenticatedUser(ctx));
+        broadcastUserUpdated(id);
         ctx.json(userToMap(user));
     }
 
@@ -111,6 +143,7 @@ public class UserController {
         @SuppressWarnings("unchecked")
         Map<String, String> body = ctx.bodyAsClass(Map.class);
         User user = userService.changeUsername(id, body.get("username"), getAuthenticatedUser(ctx));
+        broadcastUserUpdated(id);
         ctx.json(userToMap(user));
     }
 
@@ -119,12 +152,14 @@ public class UserController {
         @SuppressWarnings("unchecked")
         Map<String, String> body = ctx.bodyAsClass(Map.class);
         User user = userService.changePassword(id, body.get("password"), getAuthenticatedUser(ctx));
+        broadcastUserUpdated(id);
         ctx.json(userToMap(user));
     }
 
     public void handleDeleteUser(Context ctx) {
         String id = ctx.pathParam("id");
         userService.deleteAccount(id, getAuthenticatedUser(ctx));
+        broadcastUserDeleted(id);
         ctx.json(Map.of("message", "User deleted."));
     }
 
@@ -135,7 +170,11 @@ public class UserController {
         map.put("role", roleOf(user));
         if (user instanceof Bidder b) map.put("balance", b.getBalance());
         if (user instanceof Seller s) map.put("balance", s.getBalance());
-        if (user instanceof BannableUser bu) map.put("banned", bu.isBanned());
+        if (user instanceof BannableUser bu) {
+            map.put("banned", bu.isBanned());
+            map.put("banType", bu.getBanType() != null ? bu.getBanType().name() : null);
+            map.put("banExpiryUnix", bu.getBanExpiryUnix());
+        }
         return map;
     }
 
@@ -193,5 +232,21 @@ public class UserController {
         if (user instanceof Admin) return "ADMIN";
         if (user instanceof Seller) return "SELLER";
         return "BIDDER";
+    }
+
+    private void broadcastUserUpdated(String userId) {
+        if (eventBroadcaster != null) eventBroadcaster.broadcastUserUpdated(userId);
+    }
+
+    private void broadcastUserBanned(String userId) {
+        if (eventBroadcaster != null) eventBroadcaster.broadcastUserBanned(userId);
+    }
+
+    private void broadcastUserDeleted(String userId) {
+        if (eventBroadcaster != null) eventBroadcaster.broadcastUserDeleted(userId);
+    }
+
+    private void broadcastUsersChanged() {
+        if (eventBroadcaster != null) eventBroadcaster.broadcastUsersChanged();
     }
 }

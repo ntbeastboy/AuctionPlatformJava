@@ -67,6 +67,8 @@ public class RestItemService extends ItemService {
         body.put("description", item.getDescription());
         body.put("startPrice", item.getStartingPrice());
         body.put("priceStep", item.getPriceStep());
+        body.put("imageData", item.getImageData());
+        body.put("imageDataList", item.getImageDataList());
 
         // Server expects durationMinutes — convert from the start/end window
         // the local controller already computed.

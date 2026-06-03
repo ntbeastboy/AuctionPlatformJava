@@ -17,6 +17,7 @@ import org.junit.jupiter.api.Test;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -125,7 +126,7 @@ class BidServiceAutoBidTest {
     }
 
     @Test
-    void sameCheckTimeAndSameMaxBidPrioritizesSmallerUserId() {
+    void sameCheckTimeAndSameMaxBidKeepsRepositoryOrder() {
         Fixture fx = new Fixture();
         Bidder userOne = new Bidder("1", "one", "pw");
         Bidder userTwo = new Bidder("2", "two", "pw");
@@ -141,14 +142,14 @@ class BidServiceAutoBidTest {
         fx.resolveAutoBids();
 
         Item item = fx.items.findById(fx.item.getId()).orElseThrow();
-        assertEquals(userOne.getId(), item.getCurrentWinnerId());
+        assertEquals(userTwo.getId(), item.getCurrentWinnerId());
         assertEquals(110.0, item.getCurrentPrice());
 
         fx.clock.advance(5_000);
         fx.resolveAutoBids();
 
         Item afterNextSharedCheck = fx.items.findById(fx.item.getId()).orElseThrow();
-        assertEquals(userOne.getId(), afterNextSharedCheck.getCurrentWinnerId());
+        assertEquals(userTwo.getId(), afterNextSharedCheck.getCurrentWinnerId());
         assertEquals(110.0, afterNextSharedCheck.getCurrentPrice());
     }
 
@@ -244,7 +245,7 @@ class BidServiceAutoBidTest {
     }
 
     private static class InMemoryAutoBidRepository implements AutoBidRepository {
-        private final Map<String, AutoBid> autoBids = new HashMap<>();
+        private final Map<String, AutoBid> autoBids = new LinkedHashMap<>();
 
         @Override public void save(AutoBid autoBid) {
             autoBids.put(key(autoBid.getUserId(), autoBid.getItemId()), autoBid);

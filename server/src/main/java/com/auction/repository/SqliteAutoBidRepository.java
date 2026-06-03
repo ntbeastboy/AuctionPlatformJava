@@ -60,7 +60,7 @@ public class SqliteAutoBidRepository implements AutoBidRepository {
 
     @Override
     public List<AutoBid> findByItemId(String itemId) {
-        String sql = "SELECT * FROM auto_bids WHERE item_id = ? ORDER BY next_check_at ASC, max_bid DESC, user_id ASC";
+        String sql = "SELECT * FROM auto_bids WHERE item_id = ? ORDER BY next_check_at ASC, max_bid DESC, rowid ASC";
         return query(sql, itemId);
     }
 

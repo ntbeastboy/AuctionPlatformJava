@@ -53,21 +53,38 @@ public class UserService {
 
         if (!PasswordUtil.verify(password, user.getPassword()))
             throw new UnauthorizedActionException("Invalid username or password.");
+        if (user instanceof BannableUser bu && bu.isBanned())
+            throw new UnauthorizedActionException("This account is banned.");
 
         return user;
     }
     
     public Optional<User> findById(String bidderId) { return userRepository.findById(bidderId);}
 
-    public User banUser(String targetUserId, User adminUser) {
+    public User banUser(String targetUserId, long durationSeconds, User adminUser) {
         requireAdmin(adminUser);
-        if (adminUser.getId().equals(targetUserId))
-            throw new UnauthorizedActionException("Admins cannot ban their own account.");
+        if (durationSeconds <= 0)
+            throw new InvalidInputException("Ban duration must be positive.");
         User user = userRepository.findById(targetUserId)
                 .orElseThrow(() -> new UserNotFoundException("User not found: " + targetUserId));
+        if (user instanceof Admin)
+            throw new UnauthorizedActionException("Admin accounts cannot be banned.");
         if (!(user instanceof BannableUser bu))
             throw new IllegalStateException("This user type cannot be banned.");
-        bu.banPermanent();
+        bu.banTemporary(durationSeconds);
+        userRepository.save(user);
+        return user;
+    }
+
+    public User unbanUser(String targetUserId, User adminUser) {
+        requireAdmin(adminUser);
+        User user = userRepository.findById(targetUserId)
+                .orElseThrow(() -> new UserNotFoundException("User not found: " + targetUserId));
+        if (user instanceof Admin)
+            throw new UnauthorizedActionException("Admin accounts cannot be unbanned.");
+        if (!(user instanceof BannableUser bu))
+            throw new IllegalStateException("This user type cannot be unbanned.");
+        bu.unban();
         userRepository.save(user);
         return user;
     }

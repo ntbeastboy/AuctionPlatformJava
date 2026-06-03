@@ -119,9 +119,19 @@ public class RestUserService extends UserService {
         }
     }
 
-    public User banUser(String userId) {
+    public User banUser(String userId, long durationSeconds) {
         try {
-            String response = http.post("/users/" + userId + "/ban", "{}");
+            String response = http.post("/users/" + userId + "/ban?durationSeconds=" + durationSeconds, "{}");
+            Map<String, Object> map = http.getGson().fromJson(response, MAP);
+            return JsonMappers.toUser(map);
+        } catch (IOException e) {
+            throw new UnauthorizedActionException(extract(e));
+        }
+    }
+
+    public User unbanUser(String userId) {
+        try {
+            String response = http.post("/users/" + userId + "/unban", "{}");
             Map<String, Object> map = http.getGson().fromJson(response, MAP);
             return JsonMappers.toUser(map);
         } catch (IOException e) {

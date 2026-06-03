@@ -21,13 +21,10 @@
             <VBox spacing="10">
                 <TableView fx:id="itemTable" VBox.vgrow="ALWAYS" styleClass="item-table">
                     <columns>
-                        <TableColumn fx:id="colName"       text="Name"          prefWidth="160"/>
-                        <TableColumn fx:id="colType"       text="Type"          prefWidth="90"/>
-                        <TableColumn fx:id="colStatus"     text="Status"        prefWidth="90"/>
-                        <TableColumn fx:id="colPrice"      text="Current Price" prefWidth="110"/>
-                        <TableColumn fx:id="colMinBid"     text="Min Next Bid"  prefWidth="110"/>
-                        <TableColumn fx:id="colEndTime"    text="End Time"      prefWidth="150"/>
-                        <TableColumn fx:id="colWinner"     text="Winner"        prefWidth="110"/>
+                        <TableColumn fx:id="colThumbnail"  text="Image"         prefWidth="100"/>
+                        <TableColumn fx:id="colName"       text="Name"          prefWidth="260"/>
+                        <TableColumn fx:id="colPrice"      text="Price"         prefWidth="140"/>
+                        <TableColumn fx:id="colEndTime"    text="End Bid Time"  prefWidth="190"/>
                     </columns>
                     <columnResizePolicy>
                         <TableView fx:constant="CONSTRAINED_RESIZE_POLICY"/>
@@ -65,6 +62,7 @@
                 <HBox spacing="8" alignment="CENTER_LEFT">
                     <Button text="Refresh" onAction="#onRefreshUsers" styleClass="btn-secondary"/>
                     <Button text="Ban" onAction="#onBanUser" styleClass="btn-danger"/>
+                    <Button text="Unban" onAction="#onUnbanUser" styleClass="btn-secondary"/>
                     <Button text="Change Username" onAction="#onChangeUsername" styleClass="btn-secondary"/>
                     <Button text="Change Password" onAction="#onChangePassword" styleClass="btn-secondary"/>
                     <Button text="Delete Account" onAction="#onDeleteUser" styleClass="btn-danger"/>

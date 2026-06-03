@@ -16,6 +16,11 @@ public abstract class BannableUser extends User {
         this.banExpiryUnix = System.currentTimeMillis() / 1000L + durationSeconds;
     }
 
+    public void restoreTemporaryBan(long banExpiryUnix) {
+        this.banType = BanType.TEMPORARY;
+        this.banExpiryUnix = banExpiryUnix;
+    }
+
     public void banPermanent() {
         this.banType = BanType.PERMANENT;
         this.banExpiryUnix = 0;

@@ -172,6 +172,8 @@ public class ItemController {
         map.put("sellerId", item.getSellerId());
         map.put("status", item.getStatus().name());
         map.put("currentWinnerId", item.getCurrentWinnerId());
+        map.put("imageData", item.getImageData());
+        map.put("imageDataList", item.getImageDataList());
         if (item.getBidStartTime() != null) map.put("bidStartTime", item.getBidStartTime().toString());
         if (item.getBidEndTime() != null) map.put("bidEndTime", item.getBidEndTime().toString());
 
