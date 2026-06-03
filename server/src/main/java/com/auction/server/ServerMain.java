@@ -54,7 +54,8 @@ public class ServerMain {
         banExpiryScheduler.recoverScheduledBans();
 
         // Controllers
-        UserController userController = new UserController(userRepo, itemRepo, autoBidRepo, userService, eventBroadcaster, banExpiryScheduler);
+        UserController userController = new UserController(userRepo, itemRepo, autoBidRepo, bidRepo,
+                userService, eventBroadcaster, banExpiryScheduler);
         ItemController itemController = new ItemController(itemRepo, userRepo, itemService, auctionService, eventBroadcaster);
         BidController bidController = new BidController(bidRepo, userRepo, bidService, eventBroadcaster);
         AuctionController auctionController = new AuctionController(userRepo, auctionService, eventBroadcaster);

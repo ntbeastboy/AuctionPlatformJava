@@ -4,6 +4,7 @@ import com.auction.exception.UnauthorizedActionException;
 import com.auction.exception.UserNotFoundException;
 import com.auction.model.*;
 import com.auction.repository.AutoBidRepository;
+import com.auction.repository.BidRepository;
 import com.auction.repository.ItemRepository;
 import com.auction.repository.UserRepository;
 import com.auction.security.JwtUtil;
@@ -12,7 +13,9 @@ import com.auction.server.events.UserBanExpiryScheduler;
 import com.auction.service.UserService;
 import io.javalin.http.Context;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public class UserController {
@@ -20,32 +23,41 @@ public class UserController {
     private final UserRepository userRepo;
     private final ItemRepository itemRepo;
     private final AutoBidRepository autoBidRepo;
+    private final BidRepository bidRepo;
     private final UserService userService;
     private final ItemEventBroadcaster eventBroadcaster;
     private final UserBanExpiryScheduler banExpiryScheduler;
 
     public UserController(UserRepository userRepo, UserService userService) {
-        this(userRepo, null, null, userService, null, null);
+        this(userRepo, null, null, null, userService, null, null);
     }
 
     public UserController(UserRepository userRepo, ItemRepository itemRepo,
                           AutoBidRepository autoBidRepo, UserService userService) {
-        this(userRepo, itemRepo, autoBidRepo, userService, null, null);
+        this(userRepo, itemRepo, autoBidRepo, null, userService, null, null);
     }
 
     public UserController(UserRepository userRepo, ItemRepository itemRepo,
                           AutoBidRepository autoBidRepo, UserService userService,
                           ItemEventBroadcaster eventBroadcaster) {
-        this(userRepo, itemRepo, autoBidRepo, userService, eventBroadcaster, null);
+        this(userRepo, itemRepo, autoBidRepo, null, userService, eventBroadcaster, null);
     }
 
     public UserController(UserRepository userRepo, ItemRepository itemRepo,
                           AutoBidRepository autoBidRepo, UserService userService,
                           ItemEventBroadcaster eventBroadcaster,
                           UserBanExpiryScheduler banExpiryScheduler) {
+        this(userRepo, itemRepo, autoBidRepo, null, userService, eventBroadcaster, banExpiryScheduler);
+    }
+
+    public UserController(UserRepository userRepo, ItemRepository itemRepo,
+                          AutoBidRepository autoBidRepo, BidRepository bidRepo,
+                          UserService userService, ItemEventBroadcaster eventBroadcaster,
+                          UserBanExpiryScheduler banExpiryScheduler) {
         this.userRepo = userRepo;
         this.itemRepo = itemRepo;
         this.autoBidRepo = autoBidRepo;
+        this.bidRepo = bidRepo;
         this.userService = userService;
         this.eventBroadcaster = eventBroadcaster;
         this.banExpiryScheduler = banExpiryScheduler;
@@ -127,7 +139,9 @@ public class UserController {
         long durationSeconds = Long.parseLong(ctx.queryParam("durationSeconds"));
         User user = userService.banUser(id, durationSeconds, getAuthenticatedUser(ctx));
         if (banExpiryScheduler != null) banExpiryScheduler.scheduleIfTemporary(user);
+        List<String> revertedItemIds = revertWinningBidsForUnavailableUser(id);
         broadcastUserBanned(id);
+        revertedItemIds.forEach(this::broadcastItemUpdated);
         ctx.json(userToMap(user));
     }
 
@@ -159,8 +173,48 @@ public class UserController {
     public void handleDeleteUser(Context ctx) {
         String id = ctx.pathParam("id");
         userService.deleteAccount(id, getAuthenticatedUser(ctx));
+        List<String> revertedItemIds = revertWinningBidsForUnavailableUser(id);
         broadcastUserDeleted(id);
+        revertedItemIds.forEach(this::broadcastItemUpdated);
         ctx.json(Map.of("message", "User deleted."));
+    }
+
+    private List<String> revertWinningBidsForUnavailableUser(String userId) {
+        if (itemRepo == null || bidRepo == null) return List.of();
+
+        List<String> changedItemIds = new ArrayList<>();
+        for (Item item : itemRepo.findAll()) {
+            if (!userId.equals(item.getCurrentWinnerId())) continue;
+            if (item.getStatus() != AuctionStatus.RUNNING && item.getStatus() != AuctionStatus.FINISHED) continue;
+
+            Bid previousWinner = previousValidBid(item.getId(), userId);
+            if (previousWinner == null) {
+                item.setCurrentWinnerId(null);
+                item.setCurrentPrice(item.getStartingPrice());
+            } else {
+                item.setCurrentWinnerId(previousWinner.getBidderId());
+                item.setCurrentPrice(previousWinner.getAmount());
+            }
+            itemRepo.update(item);
+            changedItemIds.add(item.getId());
+        }
+        return changedItemIds;
+    }
+
+    private Bid previousValidBid(String itemId, String unavailableUserId) {
+        List<Bid> bids = bidRepo.findByItemId(itemId);
+        for (int i = bids.size() - 1; i >= 0; i--) {
+            Bid bid = bids.get(i);
+            if (unavailableUserId.equals(bid.getBidderId())) continue;
+            if (isEligibleWinner(bid.getBidderId())) return bid;
+        }
+        return null;
+    }
+
+    private boolean isEligibleWinner(String userId) {
+        return userRepo.findById(userId)
+                .filter(user -> !(user instanceof BannableUser bu && bu.isBanned()))
+                .isPresent();
     }
 
     private Map<String, Object> userToMap(User user) {
@@ -248,5 +302,9 @@ public class UserController {
 
     private void broadcastUsersChanged() {
         if (eventBroadcaster != null) eventBroadcaster.broadcastUsersChanged();
+    }
+
+    private void broadcastItemUpdated(String itemId) {
+        if (eventBroadcaster != null) eventBroadcaster.broadcastItemUpdated(itemId);
     }
 }

@@ -80,12 +80,11 @@ public class BiddingController {
             @Override
             protected void updateItem(String bidderId, boolean empty) {
                 super.updateItem(bidderId, empty);
-                Optional<User> user = appState.userService.findById(bidderId);
-                if (empty || user.isEmpty()) {
+                if (empty || bidderId == null) {
                     setText(null);
                 } else {
-                    String bidderName = user.map(User::getUsername).orElse("User #" + bidderId);
-                    setText(bidderName);
+                    Optional<User> user = appState.userService.findById(bidderId);
+                    setText(bidderDisplayName(user));
                 }
             }
         });
@@ -304,5 +303,13 @@ public class BiddingController {
 
     private String typeName(Item item) {
         return item.getTypeName();
+    }
+
+    private String bidderDisplayName(Optional<User> user) {
+        if (user.isEmpty()) return "DELETED_USER";
+        User bidder = user.orElseThrow();
+        String username = bidder.getUsername();
+        if (bidder instanceof BannableUser bu && bu.isBanned()) return username + "(BANNED)";
+        return username;
     }
 }
