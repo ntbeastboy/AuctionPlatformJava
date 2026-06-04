@@ -36,3 +36,5 @@ Thumbs.db
 
 #test script
 testclient.bat
+#internal docs
+docs/

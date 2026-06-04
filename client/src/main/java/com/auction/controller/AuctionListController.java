@@ -1,7 +1,17 @@
 package com.auction.controller;
 
 import com.auction.app.AppState;
-import com.auction.model.*;
+import com.auction.model.Admin;
+import com.auction.model.Art;
+import com.auction.model.AuctionStatus;
+import com.auction.model.BannableUser;
+import com.auction.model.Bidder;
+import com.auction.model.Electronics;
+import com.auction.model.Item;
+import com.auction.model.ItemFactory;
+import com.auction.model.Seller;
+import com.auction.model.User;
+import com.auction.model.Vehicle;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import javafx.application.Platform;
@@ -12,12 +22,24 @@ import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.geometry.Insets;
 import javafx.scene.Scene;
-import javafx.scene.chart.LineChart;
-import javafx.scene.chart.NumberAxis;
-import javafx.scene.chart.XYChart;
-import javafx.scene.control.*;
+import javafx.scene.control.Alert;
+import javafx.scene.control.Button;
+import javafx.scene.control.ButtonBar;
+import javafx.scene.control.ButtonType;
+import javafx.scene.control.CheckBox;
+import javafx.scene.control.ComboBox;
+import javafx.scene.control.Dialog;
+import javafx.scene.control.Label;
+import javafx.scene.control.PasswordField;
+import javafx.scene.control.Tab;
+import javafx.scene.control.TabPane;
+import javafx.scene.control.TableCell;
+import javafx.scene.control.TableColumn;
+import javafx.scene.control.TableRow;
+import javafx.scene.control.TableView;
+import javafx.scene.control.TextField;
+import javafx.scene.control.TextInputDialog;
 import javafx.scene.control.cell.PropertyValueFactory;
-import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
@@ -26,24 +48,12 @@ import javafx.scene.layout.VBox;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 
-import javax.imageio.IIOImage;
-import javax.imageio.ImageIO;
-import javax.imageio.ImageWriteParam;
-import javax.imageio.ImageWriter;
-import javax.imageio.stream.ImageOutputStream;
-import java.awt.Graphics2D;
-import java.awt.RenderingHints;
-import java.awt.image.BufferedImage;
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
-import java.util.Base64;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -53,11 +63,9 @@ import java.util.function.Consumer;
 
 public class AuctionListController {
 
-    private static final DateTimeFormatter DT_FMT = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss");
-    private static final DateTimeFormatter BAN_EXPIRY_FMT = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
-    private static final int MAX_ITEM_IMAGES = 8;
-    private static final int MAX_IMAGE_EDGE_PX = 1280;
-    private static final float IMAGE_JPEG_QUALITY = 0.82f;
+  private static final DateTimeFormatter DT_FMT = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss");
+  private static final DateTimeFormatter BAN_EXPIRY_FMT = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
+  private static final int MAX_ITEM_IMAGES = 8;
 
     @FXML private Label userInfoLabel;
     @FXML private Button addFundsBtn;
@@ -130,10 +138,12 @@ public class AuctionListController {
             @Override
             protected void updateItem(Item item, boolean empty) {
                 super.updateItem(item, empty);
-                if (empty || item == null || item.getImageData() == null || item.getImageData().isBlank()) {
+                if (empty || item == null) {
+                    setGraphic(null);
+                } else if (item.getImageData() == null || item.getImageData().isBlank()) {
                     setGraphic(new Label("No image"));
                 } else {
-                    view.setImage(toImage(item.getImageData()));
+                    view.setImage(ItemImageSupport.toImage(item.getImageData()));
                     setGraphic(view);
                 }
                 setAlignment(javafx.geometry.Pos.CENTER);
@@ -231,7 +241,7 @@ public class AuctionListController {
 
     @FXML
     private void onAddFunds() {
-        showCardDialog().ifPresent(amount -> {
+        PaymentDialogFactory.showAddFundsDialog().ifPresent(amount -> {
             try {
                 // Persist via the server so the new balance survives across
                 // sessions and is visible to every other call (placeBid in
@@ -704,7 +714,7 @@ public class AuctionListController {
 
         Runnable renderImage = () -> {
             if (images.isEmpty()) return;
-            imageView.setImage(toImage(images.get(imageIndex[0])));
+            imageView.setImage(ItemImageSupport.toImage(images.get(imageIndex[0])));
             imageCounter.setText((imageIndex[0] + 1) + " / " + images.size());
             prevImageBtn.setDisable(images.size() <= 1);
             nextImageBtn.setDisable(images.size() <= 1);
@@ -724,7 +734,8 @@ public class AuctionListController {
             imagePane.getChildren().add(noImage);
         } else {
             imageView.setStyle("-fx-cursor: hand;");
-            imageView.setOnMouseClicked(e -> openImageViewer(images.get(imageIndex[0])));
+            imageView.setOnMouseClicked(e ->
+                    ItemImageSupport.openImageViewer(images.get(imageIndex[0]), stylesheetUrl()));
             renderImage.run();
             imagePane.getChildren().addAll(imageView, imageControls);
         }
@@ -810,226 +821,12 @@ public class AuctionListController {
         return row + 1;
     }
 
-    private void openImageViewer(String imageData) {
-        Image image = toImage(imageData);
-        if (image == null) return;
-
-        ImageView viewer = new ImageView(image);
-        viewer.setPreserveRatio(true);
-        viewer.setSmooth(true);
-
-        double[] zoom = {1.0};
-        Runnable applyZoom = () -> {
-            viewer.setFitWidth(Math.max(240, image.getWidth() * zoom[0]));
-            viewer.setFitHeight(Math.max(180, image.getHeight() * zoom[0]));
-        };
-
-        Button zoomOut = new Button("Zoom Out");
-        Button zoomIn = new Button("Zoom In");
-        Button reset = new Button("Reset");
-        zoomOut.setOnAction(e -> {
-            zoom[0] = Math.max(0.25, zoom[0] / 1.25);
-            applyZoom.run();
-        });
-        zoomIn.setOnAction(e -> {
-            zoom[0] = Math.min(5.0, zoom[0] * 1.25);
-            applyZoom.run();
-        });
-        reset.setOnAction(e -> {
-            zoom[0] = 1.0;
-            applyZoom.run();
-        });
-        applyZoom.run();
-
-        HBox toolbar = new HBox(8, zoomOut, reset, zoomIn);
-        toolbar.setAlignment(javafx.geometry.Pos.CENTER);
-        toolbar.setPadding(new Insets(10));
-
-        ScrollPane scroller = new ScrollPane(viewer);
-        scroller.setPannable(true);
-        scroller.setFitToWidth(false);
-        scroller.setFitToHeight(false);
-        scroller.setStyle("-fx-background-color: #0f172a;");
-
-        VBox root = new VBox(toolbar, scroller);
-        VBox.setVgrow(scroller, Priority.ALWAYS);
-
-        Stage imageStage = new Stage();
-        imageStage.setTitle("Item Image");
-        Scene scene = new Scene(root, 1000, 760);
-        scene.getStylesheets().add(getClass().getResource("/css/style.css").toExternalForm());
-        imageStage.setScene(scene);
-        imageStage.show();
-    }
-
-    private void showItemDetails(Item item) {
-        String winnerId = item.getCurrentWinnerId();
-        String winner = winnerId == null ? "—"
-                : appState.userRepository.findById(winnerId).map(User::getUsername).orElse(winnerId);
-
-        GridPane grid = new GridPane();
-        grid.setHgap(16); grid.setVgap(6);
-        int r = 0;
-
-        // Common fields
-        r = addRow(grid, r, "Name",          item.getName());
-        r = addRow(grid, r, "Description",   item.getDescription());
-        r = addRow(grid, r, "Type",          typeName(item));
-        r = addRow(grid, r, "Status",        item.getStatus().toString());
-        r = addRow(grid, r, "Starting price","$" + String.format("%,.2f", item.getStartingPrice()));
-        r = addRow(grid, r, "Current price", "$" + String.format("%,.2f", item.getCurrentPrice()));
-        r = addRow(grid, r, "Price step",    "$" + String.format("%,.2f", item.getPriceStep()));
-        r = addRow(grid, r, "Start time",    item.getStatus() != AuctionStatus.OPEN && item.getBidStartTime() != null ? item.getBidStartTime().format(DT_FMT) : "—");
-        r = addRow(grid, r, "End time",      item.getStatus() != AuctionStatus.OPEN && item.getBidEndTime()   != null ? item.getBidEndTime().format(DT_FMT)   : "—");
-        r = addRow(grid, r, "Winner",        winner);
-
-        // Type-specific fields
-        if (item instanceof Art a) {
-            r = addRow(grid, r, "Artist",        a.getArtist());
-            r = addRow(grid, r, "Painting style",a.getPaintingStyle());
-            r = addRow(grid, r, "Origin",        a.getOrigin());
-        } else if (item instanceof Electronics e) {
-            r = addRow(grid, r, "Wattage",       e.getWattage() + " W");
-            r = addRow(grid, r, "Origin",        e.getOrigin());
-            r = addRow(grid, r, "Warranty",      e.getWarrantyMonths() + " months");
-            r = addRow(grid, r, "Serial no.",    e.getSerialNumber());
-        } else if (item instanceof Vehicle v) {
-            r = addRow(grid, r, "Brand",         v.getBrand());
-            r = addRow(grid, r, "Miles",         String.valueOf(v.getMiles()));
-            r = addRow(grid, r, "Mfg date",      v.getManufacturingDate() != null ? v.getManufacturingDate().toString() : "—");
-            r = addRow(grid, r, "VIN",           v.getVin());
-            r = addRow(grid, r, "Accident history", v.hasAccidentHistory() ? "Yes" : "No");
-        }
-        Stage detailStage = new Stage();
-        detailStage.setTitle("Item Details");
-        VBox root = new VBox();
-        grid.setPadding(new Insets(13));
-        root.getChildren().add(grid);
-        Scene scene = new Scene(root, 300, 400);
-        detailStage.setScene(scene);
-        detailStage.show();
-    }
-
-    private int addRow(GridPane grid, int row, String key, String value) {
-        Label k = new Label(key + ":");
-        k.setStyle("-fx-font-weight: bold; -fx-text-fill: #555;");
-        Label v = new Label(value != null ? value : "—");
-        v.setWrapText(true); v.setMaxWidth(300);
-        grid.add(k, 0, row);
-        grid.add(v, 1, row);
-        return row + 1;
-    }
-
     private String typeName(Item item) {
         return item.getTypeName();
     }
 
-    // ── Credit Card Dialog ────────────────────────────────────────────────────
-
-    /**
-     * Shows a dialog asking for amount and card details.
-     * Returns the validated amount, or empty if cancelled or validation failed.
-     */
-    private Image toImage(String dataUrl) {
-        try {
-            String base64 = dataUrl;
-            int comma = dataUrl.indexOf(',');
-            if (comma >= 0) base64 = dataUrl.substring(comma + 1);
-            byte[] bytes = Base64.getDecoder().decode(base64);
-            return new Image(new ByteArrayInputStream(bytes));
-        } catch (Exception e) {
-            return null;
-        }
-    }
-
-    private String imageDataUrl(File file) throws IOException {
-        BufferedImage source = ImageIO.read(file);
-        if (source == null) throw new IOException("Unsupported image file.");
-
-        int width = source.getWidth();
-        int height = source.getHeight();
-        double scale = Math.min(1.0, (double) MAX_IMAGE_EDGE_PX / Math.max(width, height));
-        int targetWidth = Math.max(1, (int) Math.round(width * scale));
-        int targetHeight = Math.max(1, (int) Math.round(height * scale));
-
-        BufferedImage output = new BufferedImage(targetWidth, targetHeight, BufferedImage.TYPE_INT_RGB);
-        Graphics2D g = output.createGraphics();
-        try {
-            g.setColor(java.awt.Color.WHITE);
-            g.fillRect(0, 0, targetWidth, targetHeight);
-            g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
-            g.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
-            g.drawImage(source, 0, 0, targetWidth, targetHeight, null);
-        } finally {
-            g.dispose();
-        }
-
-        ByteArrayOutputStream out = new ByteArrayOutputStream();
-        ImageWriter writer = ImageIO.getImageWritersByFormatName("jpg").next();
-        try (ImageOutputStream ios = ImageIO.createImageOutputStream(out)) {
-            writer.setOutput(ios);
-            ImageWriteParam param = writer.getDefaultWriteParam();
-            param.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
-            param.setCompressionQuality(IMAGE_JPEG_QUALITY);
-            writer.write(null, new IIOImage(output, null, null), param);
-        } finally {
-            writer.dispose();
-        }
-
-        return "data:image/jpeg;base64," + Base64.getEncoder().encodeToString(out.toByteArray());
-    }
-
-    private java.util.Optional<Double> showCardDialog() {
-        Dialog<Double> dlg = new Dialog<>();
-        dlg.setTitle("Add Funds");
-        dlg.setHeaderText("Enter payment details");
-
-        ButtonType confirmBtn = new ButtonType("Confirm", ButtonBar.ButtonData.OK_DONE);
-        dlg.getDialogPane().getButtonTypes().addAll(confirmBtn, ButtonType.CANCEL);
-
-        TextField amountF = field("e.g. 100");
-        TextField nameF   = field("Cardholder name");
-        TextField cardF   = field("1234 5678 9012 3456");
-        TextField expiryF = field("MM/YY");
-        TextField cvvF    = field("123");
-
-        Label errorLbl = new Label();
-        errorLbl.setStyle("-fx-text-fill: #c0392b; -fx-font-size: 11px;");
-        errorLbl.setWrapText(true);
-
-        GridPane grid = new GridPane();
-        grid.setHgap(10); grid.setVgap(8);
-        grid.add(new Label("Amount ($):"),      0, 0); grid.add(amountF, 1, 0);
-        grid.add(new Label("Cardholder name:"), 0, 1); grid.add(nameF,   1, 1);
-        grid.add(new Label("Card number:"),     0, 2); grid.add(cardF,   1, 2);
-        grid.add(new Label("Expiry (MM/YY):"),  0, 3); grid.add(expiryF, 1, 3);
-        grid.add(new Label("CVV:"),             0, 4); grid.add(cvvF,    1, 4);
-        grid.add(errorLbl,                      0, 5, 2, 1);
-        dlg.getDialogPane().setContent(grid);
-
-        // Event filter on the confirm button: validate and consume (keep dialog open) on any error
-        javafx.scene.Node confirmNode = dlg.getDialogPane().lookupButton(confirmBtn);
-        confirmNode.addEventFilter(javafx.event.ActionEvent.ACTION, event -> {
-            String error = validateCard(amountF, nameF, cardF, expiryF, cvvF);
-            if (error != null) {
-                errorLbl.setText(error);
-                event.consume(); // prevents the dialog from closing
-            } else {
-                errorLbl.setText("");
-            }
-        });
-
-        dlg.setResultConverter(btn -> {
-            if (btn != confirmBtn) return null;
-            // Validation already passed via the event filter above
-            try {
-                return Double.parseDouble(amountF.getText().trim());
-            } catch (NumberFormatException e) {
-                return null;
-            }
-        });
-
-        return dlg.showAndWait();
+    private String stylesheetUrl() {
+        return getClass().getResource("/css/style.css").toExternalForm();
     }
 
     private String validateItemFields(String type, TextField nameF, TextField startPriceF,
@@ -1086,60 +883,6 @@ public class AuctionListController {
         return null;
     }
 
-    /** Returns an error message string, or null if everything is valid. */
-    private String validateCard(TextField amountF, TextField nameF, TextField cardF,
-                                TextField expiryF, TextField cvvF) {
-        // Amount — plain decimal only; reject scientific notation (e.g. 1e3).
-        String amountStr = amountF.getText().trim();
-        if (!amountStr.matches("\\d+(\\.\\d+)?"))
-            return "Amount must be a plain number (e.g. 100 or 99.99)";
-        try {
-            double amount = Double.parseDouble(amountStr);
-            if (amount <= 0) return "Amount must be positive.";
-        } catch (NumberFormatException e) {
-            return "Amount is not a valid number.";
-        }
-
-        // Name
-        if (nameF.getText().trim().isEmpty())
-            return "Cardholder name is required.";
-
-        // Card number
-        String cardNum = cardF.getText().replaceAll("[\\s\\-]", "");
-        if (!cardNum.matches("\\d{13,19}"))
-            return "Card number must be 13–19 digits.";
-        if (!passesLuhn(cardNum))
-            return "Invalid card number (failed Luhn check).";
-
-        // Expiry
-        String expiry = expiryF.getText().trim();
-        if (!expiry.matches("(0[1-9]|1[0-2])/\\d{2}"))
-            return "Expiry must be MM/YY (e.g. 08/27).";
-        String[] parts = expiry.split("/");
-        YearMonth cardExpiry = YearMonth.of(2000 + Integer.parseInt(parts[1]), Integer.parseInt(parts[0]));
-        if (cardExpiry.isBefore(YearMonth.now()))
-            return "Card has expired.";
-
-        // CVV
-        if (!cvvF.getText().trim().matches("\\d{3,4}"))
-            return "CVV must be 3 or 4 digits.";
-
-        return null; // all valid
-    }
-
-    /** Luhn algorithm check. */
-    private boolean passesLuhn(String number) {
-        int sum = 0;
-        boolean alternate = false;
-        for (int i = number.length() - 1; i >= 0; i--) {
-            int n = Character.getNumericValue(number.charAt(i));
-            if (alternate) { n *= 2; if (n > 9) n -= 9; }
-            sum += n;
-            alternate = !alternate;
-        }
-        return sum % 10 == 0;
-    }
-
     // ── Create Item Dialog ────────────────────────────────────────────────────
 
     private Dialog<Item> buildItemDialog(Item existing) {
@@ -1172,7 +915,9 @@ public class AuctionListController {
             }
             try {
                 imageData.clear();
-                for (File file : files) imageData.add(imageDataUrl(file));
+                for (File file : files) {
+                    imageData.add(ItemImageSupport.imageDataUrl(file));
+                }
                 imageNameLbl.setText(files.size() + " image(s) selected");
             } catch (IOException ex) {
                 imageNameLbl.setText("Could not load images");
