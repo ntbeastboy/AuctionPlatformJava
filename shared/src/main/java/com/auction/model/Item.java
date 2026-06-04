@@ -1,100 +1,148 @@
 package com.auction.model;
 
 import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 
 public abstract class Item implements Entity {
-    final String id;
-    private String name;
-    private String description;
-    final double startingPrice;
-    private double currentPrice;
-    final double priceStep;
-    private LocalDateTime bidStartTime;
-    private LocalDateTime bidEndTime;
-    final String sellerId;
-    private AuctionStatus status;
-    private String currentWinnerId;
-    private List<String> imageDataList = new ArrayList<>();
-    private long version;
+  final String id;
+  private String name;
+  private String description;
+  final double startingPrice;
+  private double currentPrice;
+  final double priceStep;
+  private LocalDateTime bidStartTime;
+  private LocalDateTime bidEndTime;
+  final String sellerId;
+  private AuctionStatus status;
+  private String currentWinnerId;
+  private List<String> imageDataList = new ArrayList<>();
+  private long version;
 
-    public Item(String id, String name, String description, double startingPrice, double priceStep, LocalDateTime bidStartTime, LocalDateTime bidEndTime, String sellerId) {
-        this.id = id;
-        this.name = name;
-        this.description = description;
-        this.startingPrice = startingPrice;
-        this.currentPrice = startingPrice;
-        this.priceStep = priceStep;
-        this.bidStartTime = bidStartTime;
-        this.bidEndTime = bidEndTime;
-        this.sellerId = sellerId;
-        this.status = AuctionStatus.OPEN;
-        this.currentWinnerId = null;
-        this.version = 0;
+  public Item(
+      String id,
+      String name,
+      String description,
+      double startingPrice,
+      double priceStep,
+      LocalDateTime bidStartTime,
+      LocalDateTime bidEndTime,
+      String sellerId) {
+    this.id = id;
+    this.name = name;
+    this.description = description;
+    this.startingPrice = startingPrice;
+    this.currentPrice = startingPrice;
+    this.priceStep = priceStep;
+    this.bidStartTime = bidStartTime;
+    this.bidEndTime = bidEndTime;
+    this.sellerId = sellerId;
+    this.status = AuctionStatus.OPEN;
+    this.currentWinnerId = null;
+    this.version = 0;
+  }
+
+  @Override
+  public String getId() {
+    return id;
+  }
+
+  public String getName() {
+    return name;
+  }
+
+  public void setName(String name) {
+    this.name = name;
+  }
+
+  public String getDescription() {
+    return description;
+  }
+
+  public void setDescription(String description) {
+    this.description = description;
+  }
+
+  public double getStartingPrice() {
+    return startingPrice;
+  }
+
+  public double getCurrentPrice() {
+    return currentPrice;
+  }
+
+  public void setCurrentPrice(double currentPrice) {
+    this.currentPrice = currentPrice;
+  }
+
+  public double getPriceStep() {
+    return priceStep;
+  }
+
+  public LocalDateTime getBidStartTime() {
+    return bidStartTime;
+  }
+
+  public void setBidStartTime(LocalDateTime bidStartTime) {
+    this.bidStartTime = bidStartTime;
+  }
+
+  public LocalDateTime getBidEndTime() {
+    return bidEndTime;
+  }
+
+  public void setBidEndTime(LocalDateTime bidEndTime) {
+    this.bidEndTime = bidEndTime;
+  }
+
+  public String getSellerId() {
+    return sellerId;
+  }
+
+  public AuctionStatus getStatus() {
+    return status;
+  }
+
+  public void setStatus(AuctionStatus status) {
+    this.status = status;
+  }
+
+  public String getCurrentWinnerId() {
+    return currentWinnerId;
+  }
+
+  public void setCurrentWinnerId(String currentWinnerId) {
+    this.currentWinnerId = currentWinnerId;
+  }
+
+  public String getImageData() {
+    return imageDataList.isEmpty() ? null : imageDataList.get(0);
+  }
+
+  public void setImageData(String imageData) {
+    imageDataList = new ArrayList<>();
+    if (imageData != null && !imageData.isBlank()) imageDataList.add(imageData);
+  }
+
+  public List<String> getImageDataList() {
+    return new ArrayList<>(imageDataList);
+  }
+
+  public void setImageDataList(List<String> imageDataList) {
+    this.imageDataList = new ArrayList<>();
+    if (imageDataList == null) return;
+    for (String imageData : imageDataList) {
+      if (imageData != null && !imageData.isBlank()) this.imageDataList.add(imageData);
     }
+  }
 
-    @Override
-    public String getId() { return id; }
+  public long getVersion() {
+    return version;
+  }
 
-    public String getName() { return name; }
+  public void setVersion(long version) {
+    this.version = version;
+  }
 
-    public void setName(String name) { this.name = name; }
-
-    public String getDescription() { return description; }
-
-    public void setDescription(String description) { this.description = description; }
-
-    public double getStartingPrice() { return startingPrice; }
-
-    public double getCurrentPrice() { return currentPrice; }
-
-    public void setCurrentPrice(double currentPrice) { this.currentPrice = currentPrice; }
-
-    public double getPriceStep() { return priceStep; }
-
-    public LocalDateTime getBidStartTime() { return bidStartTime; }
-
-    public void setBidStartTime(LocalDateTime bidStartTime) { this.bidStartTime = bidStartTime; }
-
-    public LocalDateTime getBidEndTime() { return bidEndTime; }
-
-    public void setBidEndTime(LocalDateTime bidEndTime) { this.bidEndTime = bidEndTime; }
-
-    public String getSellerId() { return sellerId; }
-
-    public AuctionStatus getStatus() { return status; }
-
-    public void setStatus(AuctionStatus status) { this.status = status; }
-
-    public String getCurrentWinnerId() { return currentWinnerId; }
-
-    public void setCurrentWinnerId(String currentWinnerId) { this.currentWinnerId = currentWinnerId; }
-
-    public String getImageData() {
-        return imageDataList.isEmpty() ? null : imageDataList.get(0);
-    }
-
-    public void setImageData(String imageData) {
-        imageDataList = new ArrayList<>();
-        if (imageData != null && !imageData.isBlank()) imageDataList.add(imageData);
-    }
-
-    public List<String> getImageDataList() { return new ArrayList<>(imageDataList); }
-
-    public void setImageDataList(List<String> imageDataList) {
-        this.imageDataList = new ArrayList<>();
-        if (imageDataList == null) return;
-        for (String imageData : imageDataList) {
-            if (imageData != null && !imageData.isBlank()) this.imageDataList.add(imageData);
-        }
-    }
-
-    public long getVersion() { return version; }
-
-    public void setVersion(long version) { this.version = version; }
-
-    public abstract String getTypeName();
-
+  public abstract String getTypeName();
 }

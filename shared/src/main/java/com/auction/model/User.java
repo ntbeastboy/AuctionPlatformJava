@@ -1,24 +1,34 @@
 package com.auction.model;
 
 public abstract class User implements Entity {
-    private final String id;
-    private String username;
-    private String password;
+  private final String id;
+  private String username;
+  private String password;
 
-    public User(String id, String username, String password) {
-        this.id = id;
-        this.username = username;
-        this.password = password;
-    }
+  public User(String id, String username, String password) {
+    this.id = id;
+    this.username = username;
+    this.password = password;
+  }
 
-    @Override
-    public String getId() { return id; }
+  @Override
+  public String getId() {
+    return id;
+  }
 
-    public String getUsername() { return username; }
+  public String getUsername() {
+    return username;
+  }
 
-    public void setUsername(String username) { this.username = username; }
+  public void setUsername(String username) {
+    this.username = username;
+  }
 
-    public String getPassword() { return password; }
+  public String getPassword() {
+    return password;
+  }
 
-    public void setPassword(String password) { this.password = password; }
+  public void setPassword(String password) {
+    this.password = password;
+  }
 }

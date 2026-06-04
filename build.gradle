@@ -1,5 +1,10 @@
+plugins {
+    id 'com.diffplug.spotless' version '6.25.0' apply false
+}
+
 subprojects {
     apply plugin: 'java'
+    apply plugin: 'com.diffplug.spotless'
 
     group = 'com.auction'
     version = '1.0-SNAPSHOT'
@@ -24,5 +29,61 @@ subprojects {
 
     tasks.withType(Test).configureEach {
         useJUnitPlatform()
+    }
+
+    spotless {
+        java {
+            target 'src/**/*.java'
+            googleJavaFormat('1.35.0')
+            removeUnusedImports()
+            formatAnnotations()
+        }
+    }
+
+    tasks.register('checkGoogleJavaStyleHardRules') {
+        def javaSources = fileTree(projectDir) {
+            include 'src/**/*.java'
+            exclude '**/build/**'
+        }
+        inputs.files(javaSources)
+
+        doLast {
+            def violations = []
+            javaSources.files.each { source ->
+                if (!source.name.endsWith('.java')) {
+                    return
+                }
+                def hasPackage = false
+                source.eachLine { line, number ->
+                    if (number <= 5 && line ==~ /\s*package\s+[^;]+;/) {
+                        hasPackage = true
+                    }
+                    if (line.contains('\t')) {
+                        violations << "${source}:${number}: tab characters are not allowed"
+                    }
+                    if (line ==~ /\s*import\s+(static\s+)?[^;]*\.\*;/) {
+                        violations << "${source}:${number}: wildcard imports are not allowed"
+                    }
+                    if (!(line ==~ /\s*(package|import)\s+.*/) && line.length() > 100) {
+                        violations << "${source}:${number}: line exceeds 100 columns"
+                    }
+                    if (line =~ /[âÃ�]/) {
+                        violations << "${source}:${number}: possible encoding-damaged text"
+                    }
+                }
+                if (!hasPackage) {
+                    violations << "${source}:1: missing package declaration"
+                }
+            }
+            if (!violations.isEmpty()) {
+                throw new GradleException(
+                        "Google Java Style hard-rule violations:\n" + violations.join('\n'))
+            }
+        }
+    }
+
+    tasks.named('check') {
+        dependsOn tasks.named('spotlessCheck')
+        dependsOn tasks.named('checkGoogleJavaStyleHardRules')
     }
 }

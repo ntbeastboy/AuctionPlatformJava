@@ -5,9 +5,9 @@ import java.util.concurrent.locks.ReentrantLock;
 
 public class ItemLockManager {
 
-    private static final ConcurrentHashMap<String, ReentrantLock> LOCKS = new ConcurrentHashMap<>();
+  private static final ConcurrentHashMap<String, ReentrantLock> LOCKS = new ConcurrentHashMap<>();
 
-    public static ReentrantLock getLock(String itemId) {
-        return LOCKS.computeIfAbsent(itemId, k -> new ReentrantLock());
-    }
+  public static ReentrantLock getLock(String itemId) {
+    return LOCKS.computeIfAbsent(itemId, k -> new ReentrantLock());
+  }
 }

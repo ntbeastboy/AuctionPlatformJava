@@ -7,68 +7,74 @@ import java.sql.Statement;
 
 public class DatabaseManager {
 
-    private static DatabaseManager instance;
+  private static DatabaseManager instance;
 
-    private final Connection connection;
+  private final Connection connection;
 
-    public static synchronized DatabaseManager getInstance(String dbPath) {
-        if (instance == null) instance = new DatabaseManager(dbPath);
-        return instance;
+  public static synchronized DatabaseManager getInstance(String dbPath) {
+    if (instance == null) instance = new DatabaseManager(dbPath);
+    return instance;
+  }
+
+  public DatabaseManager(String dbPath) {
+    try {
+      connection = DriverManager.getConnection("jdbc:sqlite:" + dbPath);
+      connection.setAutoCommit(true);
+      try (Statement stmt = connection.createStatement()) {
+        // Enforce FKs and use WAL for better read/write concurrency.
+        stmt.execute("PRAGMA foreign_keys = ON");
+        stmt.execute("PRAGMA journal_mode = WAL");
+      }
+      createTables();
+    } catch (SQLException e) {
+      throw new RuntimeException("Failed to initialize SQLite database: " + e.getMessage(), e);
     }
+  }
 
-    public DatabaseManager(String dbPath) {
-        try {
-            connection = DriverManager.getConnection("jdbc:sqlite:" + dbPath);
-            connection.setAutoCommit(true);
-            try (Statement stmt = connection.createStatement()) {
-                // Enforce FKs and use WAL for better read/write concurrency.
-                stmt.execute("PRAGMA foreign_keys = ON");
-                stmt.execute("PRAGMA journal_mode = WAL");
-            }
-            createTables();
-        } catch (SQLException e) {
-            throw new RuntimeException("Failed to initialize SQLite database: " + e.getMessage(), e);
-        }
+  public Connection getConnection() {
+    return connection;
+  }
+
+  /**
+   * Run the given action inside a SQLite transaction. Commits on normal return; rolls back on any
+   * thrown exception. Synchronizes on the single shared {@link Connection} so callers don't trample
+   * each other's autoCommit state.
+   */
+  public synchronized void inTransaction(TxAction action) {
+    boolean prevAutoCommit;
+    try {
+      prevAutoCommit = connection.getAutoCommit();
+      connection.setAutoCommit(false);
+    } catch (SQLException e) {
+      throw new RuntimeException("Failed to begin transaction: " + e.getMessage(), e);
     }
-
-    public Connection getConnection() {
-        return connection;
+    try {
+      action.run();
+      connection.commit();
+    } catch (RuntimeException | SQLException ex) {
+      try {
+        connection.rollback();
+      } catch (SQLException ignored) {
+      }
+      if (ex instanceof RuntimeException re) throw re;
+      throw new RuntimeException("Transaction failed: " + ex.getMessage(), ex);
+    } finally {
+      try {
+        connection.setAutoCommit(prevAutoCommit);
+      } catch (SQLException ignored) {
+      }
     }
+  }
 
-    /**
-     * Run the given action inside a SQLite transaction. Commits on normal
-     * return; rolls back on any thrown exception. Synchronizes on the single
-     * shared {@link Connection} so callers don't trample each other's
-     * autoCommit state.
-     */
-    public synchronized void inTransaction(TxAction action) {
-        boolean prevAutoCommit;
-        try {
-            prevAutoCommit = connection.getAutoCommit();
-            connection.setAutoCommit(false);
-        } catch (SQLException e) {
-            throw new RuntimeException("Failed to begin transaction: " + e.getMessage(), e);
-        }
-        try {
-            action.run();
-            connection.commit();
-        } catch (RuntimeException | SQLException ex) {
-            try { connection.rollback(); } catch (SQLException ignored) {}
-            if (ex instanceof RuntimeException re) throw re;
-            throw new RuntimeException("Transaction failed: " + ex.getMessage(), ex);
-        } finally {
-            try { connection.setAutoCommit(prevAutoCommit); } catch (SQLException ignored) {}
-        }
-    }
+  @FunctionalInterface
+  public interface TxAction {
+    void run() throws SQLException;
+  }
 
-    @FunctionalInterface
-    public interface TxAction {
-        void run() throws SQLException;
-    }
-
-    private void createTables() throws SQLException {
-        try (Statement stmt = connection.createStatement()) {
-            stmt.executeUpdate("""
+  private void createTables() throws SQLException {
+    try (Statement stmt = connection.createStatement()) {
+      stmt.executeUpdate(
+          """
                 CREATE TABLE IF NOT EXISTS users (
                     id TEXT PRIMARY KEY,
                     username TEXT UNIQUE NOT NULL,
@@ -80,7 +86,8 @@ public class DatabaseManager {
                 )
             """);
 
-            stmt.executeUpdate("""
+      stmt.executeUpdate(
+          """
                 CREATE TABLE IF NOT EXISTS items (
                     id TEXT PRIMARY KEY,
                     name TEXT NOT NULL,
@@ -111,9 +118,10 @@ public class DatabaseManager {
                     version INTEGER NOT NULL DEFAULT 0
                 )
             """);
-            ensureColumn(stmt, "items", "image_data", "TEXT");
+      ensureColumn(stmt, "items", "image_data", "TEXT");
 
-            stmt.executeUpdate("""
+      stmt.executeUpdate(
+          """
                 CREATE TABLE IF NOT EXISTS bids (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     bidder_id TEXT NOT NULL,
@@ -123,7 +131,8 @@ public class DatabaseManager {
                 )
             """);
 
-            stmt.executeUpdate("""
+      stmt.executeUpdate(
+          """
                 CREATE TABLE IF NOT EXISTS auto_bids (
                     user_id TEXT NOT NULL,
                     item_id TEXT NOT NULL,
@@ -136,29 +145,30 @@ public class DatabaseManager {
                 )
             """);
 
-            stmt.executeUpdate("CREATE INDEX IF NOT EXISTS idx_bids_item_id ON bids(item_id)");
-            stmt.executeUpdate("CREATE INDEX IF NOT EXISTS idx_bids_bidder_id ON bids(bidder_id)");
-            stmt.executeUpdate("CREATE INDEX IF NOT EXISTS idx_auto_bids_item_id ON auto_bids(item_id)");
-            stmt.executeUpdate("CREATE INDEX IF NOT EXISTS idx_auto_bids_user_id ON auto_bids(user_id)");
-        }
+      stmt.executeUpdate("CREATE INDEX IF NOT EXISTS idx_bids_item_id ON bids(item_id)");
+      stmt.executeUpdate("CREATE INDEX IF NOT EXISTS idx_bids_bidder_id ON bids(bidder_id)");
+      stmt.executeUpdate("CREATE INDEX IF NOT EXISTS idx_auto_bids_item_id ON auto_bids(item_id)");
+      stmt.executeUpdate("CREATE INDEX IF NOT EXISTS idx_auto_bids_user_id ON auto_bids(user_id)");
     }
+  }
 
-    private void ensureColumn(Statement stmt, String table, String column, String definition) throws SQLException {
-        try (var rs = stmt.executeQuery("PRAGMA table_info(" + table + ")")) {
-            while (rs.next()) {
-                if (column.equalsIgnoreCase(rs.getString("name"))) return;
-            }
-        }
-        stmt.executeUpdate("ALTER TABLE " + table + " ADD COLUMN " + column + " " + definition);
+  private void ensureColumn(Statement stmt, String table, String column, String definition)
+      throws SQLException {
+    try (var rs = stmt.executeQuery("PRAGMA table_info(" + table + ")")) {
+      while (rs.next()) {
+        if (column.equalsIgnoreCase(rs.getString("name"))) return;
+      }
     }
+    stmt.executeUpdate("ALTER TABLE " + table + " ADD COLUMN " + column + " " + definition);
+  }
 
-    public void close() {
-        try {
-            if (connection != null && !connection.isClosed()) {
-                connection.close();
-            }
-        } catch (SQLException e) {
-            System.err.println("Error closing database: " + e.getMessage());
-        }
+  public void close() {
+    try {
+      if (connection != null && !connection.isClosed()) {
+        connection.close();
+      }
+    } catch (SQLException e) {
+      System.err.println("Error closing database: " + e.getMessage());
     }
+  }
 }

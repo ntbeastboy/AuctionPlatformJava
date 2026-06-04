@@ -1,29 +1,31 @@
 package com.auction.model;
 
 public class Bidder extends BannableUser {
-    private double balance;
+  private double balance;
 
-    public Bidder(String id, String username, String password) {
-        super(id, username, password);
-        this.balance = 0.0;
-    }
+  public Bidder(String id, String username, String password) {
+    super(id, username, password);
+    this.balance = 0.0;
+  }
 
-    public double getBalance() { return balance; }
+  public double getBalance() {
+    return balance;
+  }
 
-    public void addFunds(double amount) {
-        if (amount <= 0) throw new IllegalArgumentException("Amount must be positive.");
-        balance += amount;
-    }
+  public void addFunds(double amount) {
+    if (amount <= 0) throw new IllegalArgumentException("Amount must be positive.");
+    balance += amount;
+  }
 
-    public void withdraw(double amount) {
-        if (amount <= 0) throw new IllegalArgumentException("Amount must be positive.");
-        if (amount > balance) throw new IllegalArgumentException("Insufficient balance.");
-        balance -= amount;
-    }
+  public void withdraw(double amount) {
+    if (amount <= 0) throw new IllegalArgumentException("Amount must be positive.");
+    if (amount > balance) throw new IllegalArgumentException("Insufficient balance.");
+    balance -= amount;
+  }
 
-    public void deductFunds(double amount) {
-        if (amount <= 0) throw new IllegalArgumentException("Amount must be positive.");
-        if (amount > balance) throw new IllegalArgumentException("Insufficient balance.");
-        balance -= amount;
-    }
+  public void deductFunds(double amount) {
+    if (amount <= 0) throw new IllegalArgumentException("Amount must be positive.");
+    if (amount > balance) throw new IllegalArgumentException("Insufficient balance.");
+    balance -= amount;
+  }
 }

@@ -53,8 +53,7 @@ final class PaymentDialogFactory {
     confirmNode.addEventFilter(
         ActionEvent.ACTION,
         event -> {
-          String error =
-              validateCard(amountField, nameField, cardField, expiryField, cvvField);
+          String error = validateCard(amountField, nameField, cardField, expiryField, cvvField);
           if (error != null) {
             errorLabel.setText(error);
             event.consume();

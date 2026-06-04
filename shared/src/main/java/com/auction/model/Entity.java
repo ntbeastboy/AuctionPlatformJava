@@ -1,4 +1,5 @@
 package com.auction.model;
 
-public interface Entity { String getId(); }
-
+public interface Entity {
+  String getId();
+}
