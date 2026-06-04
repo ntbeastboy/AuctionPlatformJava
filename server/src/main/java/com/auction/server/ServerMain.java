@@ -26,48 +26,43 @@ import com.auction.service.UserService;
 
 public class ServerMain {
 
+  private static final int DEFAULT_PORT = 8080;
+  private static final String DATABASE_FILE = "auction_data.db";
+
+  private static final String DEFAULT_ADMIN_ID = "admin-0";
+  private static final String DEFAULT_ADMIN_USERNAME = "admin";
+  private static final String DEFAULT_ADMIN_PASSWORD = "admin";
+
   public static void main(String[] args) {
-    int port = 8080;
-    if (args.length > 0) {
-      try {
-        port = Integer.parseInt(args[0]);
-      } catch (NumberFormatException ignored) {
-      }
-    }
+    int port = parsePort(args);
 
-    // Database
-    DatabaseManager db = DatabaseManager.getInstance("auction_data.db");
+    DatabaseManager db = DatabaseManager.getInstance(DATABASE_FILE);
 
-    // Repositories
     UserRepository userRepo = new SqliteUserRepository(db);
     ItemRepository itemRepo = new SqliteItemRepository(db);
     BidRepository bidRepo = new SqliteBidRepository(db);
     AutoBidRepository autoBidRepo = new SqliteAutoBidRepository(db);
 
-    // Services
     UserService userService = new UserService(userRepo);
     ItemService itemService = new ItemService(itemRepo);
+
     TransactionRunner tx = action -> db.inTransaction(action::run);
+
     BidService bidService = new BidService(itemRepo, bidRepo, userRepo, autoBidRepo, tx);
     AuctionService auctionService = new AuctionService(itemRepo, userRepo, tx);
+
     ItemEventBroadcaster eventBroadcaster = new ItemEventBroadcaster();
     UserBanExpiryScheduler banExpiryScheduler =
         new UserBanExpiryScheduler(userRepo, eventBroadcaster);
-    auctionService.setStatusChangeCallback(eventBroadcaster::broadcastItemsChanged);
-    auctionService.setItemStatusChangeCallback(eventBroadcaster::broadcastItemUpdated);
-    bidService.setItemUpdateCallback(eventBroadcaster::broadcastItemUpdated);
 
-    // Recover any RUNNING auctions left over from a previous server run:
-    // close those whose end-time has passed, reschedule the rest.
+    configureCallbacks(auctionService, bidService, eventBroadcaster);
+
     auctionService.recoverScheduledAuctions();
 
-    // Seed admin account if missing.
-    if (!userRepo.existsByUsername("admin")) {
-      userRepo.save(new Admin("admin-0", "admin", PasswordUtil.hash("admin")));
-    }
+    seedAdminIfMissing(userRepo);
+
     banExpiryScheduler.recoverScheduledBans();
 
-    // Controllers
     UserController userController =
         new UserController(
             userRepo,
@@ -77,20 +72,68 @@ public class ServerMain {
             userService,
             eventBroadcaster,
             banExpiryScheduler);
+
     ItemController itemController =
         new ItemController(itemRepo, userRepo, itemService, auctionService, eventBroadcaster);
+
     BidController bidController =
         new BidController(bidRepo, userRepo, bidService, eventBroadcaster);
+
     AuctionController auctionController =
         new AuctionController(userRepo, auctionService, eventBroadcaster);
 
-    // Server
     AuctionServer server =
         new AuctionServer(
-            userController, itemController, bidController, auctionController, eventBroadcaster);
+            userController,
+            itemController,
+            bidController,
+            auctionController,
+            eventBroadcaster);
+
     server.start(port);
 
-    // Shutdown hook
+    registerShutdownHook(auctionService, bidService, banExpiryScheduler, server, db);
+  }
+
+  private static int parsePort(String[] args) {
+    if (args.length == 0) {
+      return DEFAULT_PORT;
+    }
+
+    try {
+      return Integer.parseInt(args[0]);
+    } catch (NumberFormatException e) {
+      return DEFAULT_PORT;
+    }
+  }
+
+  private static void configureCallbacks(
+      AuctionService auctionService,
+      BidService bidService,
+      ItemEventBroadcaster eventBroadcaster) {
+
+    auctionService.setStatusChangeCallback(eventBroadcaster::broadcastItemsChanged);
+    auctionService.setItemStatusChangeCallback(eventBroadcaster::broadcastItemUpdated);
+    bidService.setItemUpdateCallback(eventBroadcaster::broadcastItemUpdated);
+  }
+
+  private static void seedAdminIfMissing(UserRepository userRepo) {
+    if (!userRepo.existsByUsername(DEFAULT_ADMIN_USERNAME)) {
+      userRepo.save(
+          new Admin(
+              DEFAULT_ADMIN_ID,
+              DEFAULT_ADMIN_USERNAME,
+              PasswordUtil.hash(DEFAULT_ADMIN_PASSWORD)));
+    }
+  }
+
+  private static void registerShutdownHook(
+      AuctionService auctionService,
+      BidService bidService,
+      UserBanExpiryScheduler banExpiryScheduler,
+      AuctionServer server,
+      DatabaseManager db) {
+
     Runtime.getRuntime()
         .addShutdownHook(
             new Thread(
