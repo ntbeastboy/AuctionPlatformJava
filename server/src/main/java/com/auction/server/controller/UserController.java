@@ -166,9 +166,11 @@ public class UserController {
     long durationSeconds = permanent ? 0 : Long.parseLong(durationParam);
     User user = userService.banUser(id, durationSeconds, permanent, getAuthenticatedUser(ctx));
     if (banExpiryScheduler != null) banExpiryScheduler.scheduleIfTemporary(user);
-    List<String> revertedItemIds = revertWinningBidsForUnavailableUser(id);
+    List<String> affectedItemIds = new ArrayList<>();
+    affectedItemIds.addAll(cancelAutoBidsForUser(id));
+    affectedItemIds.addAll(revertWinningBidsForUnavailableUser(id));
     broadcastUserBanned(id);
-    revertedItemIds.forEach(this::broadcastItemUpdated);
+    affectedItemIds.forEach(this::broadcastItemUpdated);
     ctx.json(userToMap(user));
   }
 
@@ -200,10 +202,24 @@ public class UserController {
   public void handleDeleteUser(Context ctx) {
     String id = ctx.pathParam("id");
     userService.deleteAccount(id, getAuthenticatedUser(ctx));
-    List<String> revertedItemIds = revertWinningBidsForUnavailableUser(id);
+    List<String> affectedItemIds = new ArrayList<>();
+    affectedItemIds.addAll(cancelAutoBidsForUser(id));
+    affectedItemIds.addAll(revertWinningBidsForUnavailableUser(id));
     broadcastUserDeleted(id);
-    revertedItemIds.forEach(this::broadcastItemUpdated);
+    affectedItemIds.forEach(this::broadcastItemUpdated);
     ctx.json(Map.of("message", "User deleted."));
+  }
+
+  private List<String> cancelAutoBidsForUser(String userId) {
+    if (autoBidRepo == null) return List.of();
+
+    List<AutoBid> userAutoBids = autoBidRepo.findByUserId(userId);
+    List<String> affectedItemIds = new ArrayList<>();
+    for (AutoBid autoBid : userAutoBids) {
+      autoBidRepo.delete(autoBid.getUserId(), autoBid.getItemId());
+      affectedItemIds.add(autoBid.getItemId());
+    }
+    return affectedItemIds;
   }
 
   private List<String> revertWinningBidsForUnavailableUser(String userId) {

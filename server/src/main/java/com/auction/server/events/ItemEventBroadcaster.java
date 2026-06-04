@@ -9,6 +9,15 @@ public class ItemEventBroadcaster {
 
   private final Set<WsContext> clients = ConcurrentHashMap.newKeySet();
 
+  private enum EventType {
+    ITEM_UPDATED,
+    ITEMS_CHANGED,
+    USER_UPDATED,
+    USER_BANNED,
+    USER_DELETED,
+    USERS_CHANGED
+  }
+
   public void register(Javalin app) {
     app.ws(
         "/api/events",
@@ -20,30 +29,41 @@ public class ItemEventBroadcaster {
   }
 
   public void broadcastItemUpdated(String itemId) {
-    broadcast("{\"type\":\"ITEM_UPDATED\",\"itemId\":\"" + escapeJson(itemId) + "\"}");
+    broadcast(createEvent(EventType.ITEM_UPDATED, "itemId", itemId));
   }
 
   public void broadcastItemsChanged() {
-    broadcast("{\"type\":\"ITEMS_CHANGED\"}");
+    broadcast(createEvent(EventType.ITEMS_CHANGED));
   }
 
   public void broadcastUserUpdated(String userId) {
-    broadcast("{\"type\":\"USER_UPDATED\",\"userId\":\"" + escapeJson(userId) + "\"}");
+    broadcast(createEvent(EventType.USER_UPDATED, "userId", userId));
     broadcastUsersChanged();
   }
 
   public void broadcastUserBanned(String userId) {
-    broadcast("{\"type\":\"USER_BANNED\",\"userId\":\"" + escapeJson(userId) + "\"}");
+    broadcast(createEvent(EventType.USER_BANNED, "userId", userId));
     broadcastUsersChanged();
   }
 
   public void broadcastUserDeleted(String userId) {
-    broadcast("{\"type\":\"USER_DELETED\",\"userId\":\"" + escapeJson(userId) + "\"}");
+    broadcast(createEvent(EventType.USER_DELETED, "userId", userId));
     broadcastUsersChanged();
   }
 
   public void broadcastUsersChanged() {
-    broadcast("{\"type\":\"USERS_CHANGED\"}");
+    broadcast(createEvent(EventType.USERS_CHANGED));
+  }
+
+  private String createEvent(EventType type) {
+    return "{\"type\":\"" + type.name() + "\"}";
+  }
+
+  private String createEvent(EventType type, String key, String value) {
+    return "{"
+        + "\"type\":\"" + type.name() + "\","
+        + "\"" + escapeJson(key) + "\":\"" + escapeJson(value) + "\""
+        + "}";
   }
 
   private void broadcast(String message) {
