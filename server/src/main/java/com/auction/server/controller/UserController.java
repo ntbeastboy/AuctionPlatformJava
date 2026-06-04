@@ -160,8 +160,11 @@ public class UserController {
 
   public void handleBanUser(Context ctx) {
     String id = ctx.pathParam("id");
-    long durationSeconds = Long.parseLong(ctx.queryParam("durationSeconds"));
-    User user = userService.banUser(id, durationSeconds, getAuthenticatedUser(ctx));
+    String durationParam = ctx.queryParam("durationSeconds");
+    String permanentParam = ctx.queryParam("permanent");
+    boolean permanent = "true".equalsIgnoreCase(permanentParam);
+    long durationSeconds = permanent ? 0 : Long.parseLong(durationParam);
+    User user = userService.banUser(id, durationSeconds, permanent, getAuthenticatedUser(ctx));
     if (banExpiryScheduler != null) banExpiryScheduler.scheduleIfTemporary(user);
     List<String> revertedItemIds = revertWinningBidsForUnavailableUser(id);
     broadcastUserBanned(id);

@@ -9,6 +9,7 @@ import com.auction.exception.UnauthorizedActionException;
 import com.auction.exception.UserNotFoundException;
 import com.auction.model.AuctionStatus;
 import com.auction.model.AutoBid;
+import com.auction.model.BannableUser;
 import com.auction.model.Bid;
 import com.auction.model.Bidder;
 import com.auction.model.Item;
@@ -119,6 +120,9 @@ public class BidService {
     if (!(user instanceof Bidder) && !(user instanceof Seller))
       throw new UnauthorizedActionException("Only bidders and sellers can place bids.");
 
+    if (user instanceof BannableUser bu && bu.isBanned())
+      throw new UnauthorizedActionException("Banned users cannot place bids.");
+
     Bid bid;
     ReentrantLock userLock = UserLockManager.getLock(user.getId());
     ReentrantLock itemLock = ItemLockManager.getLock(itemId);
@@ -206,6 +210,9 @@ public class BidService {
     requireAutoBidRepository();
     if (!(user instanceof Bidder) && !(user instanceof Seller))
       throw new UnauthorizedActionException("Only bidders and sellers can use auto-bidding.");
+
+    if (user instanceof BannableUser bu && bu.isBanned())
+      throw new UnauthorizedActionException("Banned users cannot use auto-bidding.");
 
     AutoBid autoBid;
     ReentrantLock userLock = UserLockManager.getLock(user.getId());

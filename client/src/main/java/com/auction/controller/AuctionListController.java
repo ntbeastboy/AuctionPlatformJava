@@ -17,7 +17,9 @@ import java.io.IOException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Consumer;
 import javafx.application.Platform;
 import javafx.beans.property.SimpleObjectProperty;
@@ -455,33 +457,88 @@ public class AuctionListController {
             showStatus("Admin accounts cannot be banned.", true);
             return;
           }
-          TextInputDialog dlg =
-              new TextInputDialog(LocalDateTime.now().plusDays(7).format(BAN_EXPIRY_FMT));
-          dlg.setTitle("Ban User");
-          dlg.setHeaderText("Enter automatic unban date and time (DD/MM/YYYY HH:MM):");
-          dlg.showAndWait()
-              .ifPresent(
-                  expiryText -> {
-                    try {
-                      LocalDateTime expiry = LocalDateTime.parse(expiryText.trim(), BAN_EXPIRY_FMT);
-                      LocalDateTime now = LocalDateTime.now();
-                      if (!expiry.isAfter(now)) {
-                        showStatus(
-                            "Unban time must be later than the current date and time.", true);
-                        return;
-                      }
-                      long durationSeconds =
-                          Math.max(1, java.time.Duration.between(now, expiry).getSeconds());
-                      appState.restUserService.banUser(user.getId(), durationSeconds);
-                      refreshUsers();
-                      showStatus("User banned until " + expiry.format(BAN_EXPIRY_FMT) + ".", false);
-                    } catch (DateTimeParseException e) {
-                      showStatus("Use DD/MM/YYYY HH:MM, e.g. 25/12/2026 14:30.", true);
-                    } catch (Exception e) {
-                      showStatus(e.getMessage(), true);
-                    }
-                  });
+          showBanDialog(user);
         });
+  }
+
+  private void showBanDialog(User user) {
+    Dialog<Map<String, Object>> dlg = new Dialog<>();
+    dlg.setTitle("Ban User");
+    dlg.setHeaderText("Ban user \"" + user.getUsername() + "\"");
+
+    GridPane grid = new GridPane();
+    grid.setHgap(10);
+    grid.setVgap(10);
+    grid.setPadding(new Insets(20, 20, 10, 20));
+
+    javafx.scene.control.CheckBox permanentCheckBox =
+        new javafx.scene.control.CheckBox("Permanent ban");
+    javafx.scene.control.TextField dateField =
+        new javafx.scene.control.TextField(LocalDateTime.now().plusDays(7).format(BAN_EXPIRY_FMT));
+    dateField.setPromptText("DD/MM/YYYY HH:MM");
+    Label dateLabel = new Label("Unban date and time:");
+
+    grid.add(permanentCheckBox, 0, 0, 2, 1);
+    grid.add(dateLabel, 0, 1);
+    grid.add(dateField, 1, 1);
+
+    permanentCheckBox
+        .selectedProperty()
+        .addListener(
+            (obs, oldVal, newVal) -> {
+              dateLabel.setDisable(newVal);
+              dateField.setDisable(newVal);
+              if (newVal) {
+                dateLabel.setStyle("-fx-opacity: 0.4;");
+                dateField.setStyle("-fx-opacity: 0.4;");
+              } else {
+                dateLabel.setStyle("");
+                dateField.setStyle("");
+              }
+            });
+
+    dlg.getDialogPane().setContent(grid);
+    ButtonType banBtn = new ButtonType("Ban", ButtonBar.ButtonData.OK_DONE);
+    dlg.getDialogPane().getButtonTypes().addAll(banBtn, ButtonType.CANCEL);
+
+    dlg.setResultConverter(
+        btn -> {
+          if (btn != banBtn) return null;
+          Map<String, Object> result = new HashMap<>();
+          result.put("permanent", permanentCheckBox.isSelected());
+          result.put("dateText", dateField.getText());
+          return result;
+        });
+
+    dlg.showAndWait()
+        .ifPresent(
+            result -> {
+              try {
+                boolean permanent = (boolean) result.get("permanent");
+                if (permanent) {
+                  appState.restUserService.banUser(user.getId(), 0, true);
+                  refreshUsers();
+                  showStatus("User banned permanently.", false);
+                } else {
+                  String dateText = (String) result.get("dateText");
+                  LocalDateTime expiry = LocalDateTime.parse(dateText.trim(), BAN_EXPIRY_FMT);
+                  LocalDateTime now = LocalDateTime.now();
+                  if (!expiry.isAfter(now)) {
+                    showStatus("Unban time must be later than the current date and time.", true);
+                    return;
+                  }
+                  long durationSeconds =
+                      Math.max(1, java.time.Duration.between(now, expiry).getSeconds());
+                  appState.restUserService.banUser(user.getId(), durationSeconds, false);
+                  refreshUsers();
+                  showStatus("User banned until " + expiry.format(BAN_EXPIRY_FMT) + ".", false);
+                }
+              } catch (DateTimeParseException e) {
+                showStatus("Use DD/MM/YYYY HH:MM, e.g. 25/12/2026 14:30.", true);
+              } catch (Exception e) {
+                showStatus(e.getMessage(), true);
+              }
+            });
   }
 
   @FXML

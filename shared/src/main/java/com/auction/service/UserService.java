@@ -67,8 +67,14 @@ public class UserService {
   }
 
   public User banUser(String targetUserId, long durationSeconds, User adminUser) {
+    return banUser(targetUserId, durationSeconds, false, adminUser);
+  }
+
+  public User banUser(
+      String targetUserId, long durationSeconds, boolean permanent, User adminUser) {
     requireAdmin(adminUser);
-    if (durationSeconds <= 0) throw new InvalidInputException("Ban duration must be positive.");
+    if (!permanent && durationSeconds <= 0)
+      throw new InvalidInputException("Ban duration must be positive.");
     User user =
         userRepository
             .findById(targetUserId)
@@ -77,7 +83,11 @@ public class UserService {
       throw new UnauthorizedActionException("Admin accounts cannot be banned.");
     if (!(user instanceof BannableUser bu))
       throw new IllegalStateException("This user type cannot be banned.");
-    bu.banTemporary(durationSeconds);
+    if (permanent) {
+      bu.banPermanent();
+    } else {
+      bu.banTemporary(durationSeconds);
+    }
     userRepository.save(user);
     return user;
   }
