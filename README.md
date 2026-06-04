@@ -18,6 +18,10 @@ Phạm vi hiện tại tập trung vào chạy local hoặc trong mạng nội b
 
 Xem video demo đầy đủ các tính năng của hệ thống đấu giá trực tuyến trên YouTube.
 
+## Tài liệu dự án
+
+Báo cáo chi tiết về thiết kế và triển khai hệ thống: [docs/BaoCaoBaiTapLon.docx](docs/BaoCaoBaiTapLon.docx)
+
 ## Công nghệ, môi trường và yêu cầu cài đặt
 
 ### Công nghệ sử dụng
