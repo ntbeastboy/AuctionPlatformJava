@@ -12,6 +12,12 @@ Phạm vi hiện tại tập trung vào chạy local hoặc trong mạng nội b
 - Lưu dữ liệu bằng SQLite trong file `auction_data.db`.
 - Chưa tích hợp cổng thanh toán thật, email/SMS hay triển khai production cloud.
 
+## Video giới thiệu sản phẩm
+
+[![Video giới thiệu AuctionPlatformJava](https://img.youtube.com/vi/OwoCRiYGEn4/maxresdefault.jpg)](https://www.youtube.com/watch?v=OwoCRiYGEn4)
+
+Xem video demo đầy đủ các tính năng của hệ thống đấu giá trực tuyến trên YouTube.
+
 ## Công nghệ, môi trường và yêu cầu cài đặt
 
 ### Công nghệ sử dụng
