@@ -14,7 +14,9 @@ import com.auction.model.Vehicle;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import java.io.IOException;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.HashMap;
@@ -81,6 +83,7 @@ public class AuctionListController {
   @FXML private TableColumn<User, String> colUserRole;
   @FXML private TableColumn<User, String> colUserBalance;
   @FXML private TableColumn<User, String> colUserBanned;
+  @FXML private TableColumn<User, String> colUserBannedUntil;
   @FXML private Label statusLabel;
 
   private AppState appState;
@@ -199,6 +202,8 @@ public class AuctionListController {
     colUserRole.setCellValueFactory(c -> new SimpleStringProperty(roleOf(c.getValue())));
     colUserBalance.setCellValueFactory(c -> new SimpleStringProperty(balanceOf(c.getValue())));
     colUserBanned.setCellValueFactory(c -> new SimpleStringProperty(bannedText(c.getValue())));
+    colUserBannedUntil.setCellValueFactory(
+        c -> new SimpleStringProperty(bannedUntilText(c.getValue())));
   }
 
   private void show(javafx.scene.Node... nodes) {
@@ -677,6 +682,16 @@ public class AuctionListController {
     if (user instanceof Admin) return "";
     if (user instanceof BannableUser bu) return bu.isBanned() ? "Yes" : "No";
     return "N/A";
+  }
+
+  private String bannedUntilText(User user) {
+    if (user instanceof Admin) return "";
+    if (!(user instanceof BannableUser bu) || !bu.isBanned()) return "-";
+    if (bu.getBanType() == BannableUser.BanType.PERMANENT) return "PERMANENT";
+    long expiryUnix = bu.getBanExpiryUnix();
+    if (expiryUnix <= 0) return "-";
+    return LocalDateTime.ofInstant(Instant.ofEpochSecond(expiryUnix), ZoneId.systemDefault())
+        .format(BAN_EXPIRY_FMT);
   }
 
   private void updatePaySellerButton() {

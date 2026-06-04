@@ -54,6 +54,7 @@
                         <TableColumn fx:id="colUserRole"     text="Role"     prefWidth="90"/>
                         <TableColumn fx:id="colUserBalance"  text="Balance"  prefWidth="110"/>
                         <TableColumn fx:id="colUserBanned"   text="Banned"   prefWidth="90"/>
+                        <TableColumn fx:id="colUserBannedUntil" text="Banned until" prefWidth="150"/>
                     </columns>
                     <columnResizePolicy>
                         <TableView fx:constant="CONSTRAINED_RESIZE_POLICY"/>

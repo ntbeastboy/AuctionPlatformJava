@@ -66,8 +66,7 @@ public final class JsonMappers {
     String banType = str(map, "banType");
     long banExpiry = Math.round(num(map, "banExpiryUnix"));
     if ("TEMPORARY".equalsIgnoreCase(banType) && banExpiry > 0) {
-      long remaining = banExpiry - System.currentTimeMillis() / 1000L;
-      if (remaining > 0) u.banTemporary(remaining);
+      u.restoreTemporaryBan(banExpiry);
     } else {
       u.banPermanent();
     }
